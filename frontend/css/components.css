@@ -1,0 +1,17 @@
+.card {
+  background: var(--bg-card);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.card.critical {
+  border: 1px solid var(--critical);
+}
+
+.card-title {
+  font-weight: 600;
+}
+
+.card-text {
+  color: var(--text-muted);
+}
