@@ -1,17 +1,35 @@
 .card {
-  background: var(--bg-card);
-  border-radius: 14px;
+  background: #020617;
+  border: 1px solid #1e293b;
+  border-radius: 16px;
   padding: 14px;
+  margin-bottom: 12px;
+}
+
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.card-text {
+  font-size: 14px;
+  line-height: 1.4;
+  color: #cbd5f5;
 }
 
 .card.critical {
   border: 1px solid var(--critical);
 }
 
-.card-title {
+.header {
+  padding: 16px;
   font-weight: 600;
-}
-
-.card-text {
-  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #1e293b;
+  background: linear-gradient(
+    180deg,
+    #020617,
+    #020617aa
+  );
 }

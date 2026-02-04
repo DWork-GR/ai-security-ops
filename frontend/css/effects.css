@@ -9,3 +9,8 @@
   66% { content: '..' }
   100% { content: '...' }
 }
+
+.thinking {
+  opacity: 0.7;
+  font-style: italic;
+}

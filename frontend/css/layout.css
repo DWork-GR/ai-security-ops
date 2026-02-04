@@ -1,11 +1,19 @@
 .app {
   width: 420px;
   height: 720px;
-  background: var(--bg-panel);
-  border-radius: 18px;
+  background: linear-gradient(
+    180deg,
+    #020617,
+    #020617dd
+  );
+  border-radius: 20px;
   display: flex;
   flex-direction: column;
+  box-shadow:
+    0 0 0 1px #1e293b,
+    0 30px 80px rgba(0,0,0,0.7);
 }
+
 
 .messages {
   flex: 1;
@@ -16,4 +24,11 @@
 .input-box {
   display: flex;
   border-top: 1px solid #1f2937;
+}
+
+.app-wrapper {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }

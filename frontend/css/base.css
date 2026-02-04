@@ -22,3 +22,13 @@ body {
   background: var(--bg-main);
   color: var(--text-main);
 }
+
+.background {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 20%, #1e293b55, transparent 40%),
+    radial-gradient(circle at 80% 80%, #0ea5e955, transparent 40%),
+    linear-gradient(180deg, #020617, #020617);
+  z-index: -1;
+}
