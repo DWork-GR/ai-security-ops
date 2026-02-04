@@ -4,97 +4,44 @@
     <meta charset="UTF-8">
     <title>AI Security Ops Chat</title>
     <style>
+        :root {
+        --bg-main: #0b0f1a;
+        --bg-panel: #111827;
+        --bg-card: #0f172a;
+
+        --text-main: #e6eaf2;
+        --text-muted: #9aa4bf;
+
+        --critical: #ff4d4f;
+        --high: #fa8c16;
+        --medium: #fadb14;
+        --low: #52c41a;
+        --info: #1890ff;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            background: #0f172a;
-            color: #e5e7eb;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
+        margin: 0;
+        font-family: 'Inter', system-ui, sans-serif;
+        background: radial-gradient(circle at top, #0e1629, var(--bg-main));
+        color: var(--text-main);
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
         }
 
-        .chat {
-            width: 420px;
-            height: 600px;
-            background: #020617;
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-        }
-
-        .header {
-            padding: 14px;
-            border-bottom: 1px solid #1e293b;
-            font-weight: bold;
-            text-align: center;
-            letter-spacing: 0.5px;
-        }
-
-        .messages {
-            flex: 1;
-            padding: 12px;
-            overflow-y: auto;
-        }
-
-        .message {
-            margin-bottom: 12px;
-            padding: 10px 12px;
-            border-radius: 8px;
-            max-width: 85%;
-            font-size: 14px;
-            white-space: pre-wrap;
-            line-height: 1.4;
-        }
-
-        .user {
-            background: #2563eb;
-            align-self: flex-end;
-        }
-
-        .bot {
-            background: #1e293b;
-            align-self: flex-start;
-        }
-
-        .debug {
-            margin-top: 8px;
-            font-size: 12px;
-            color: #94a3b8;
-            border-top: 1px dashed #334155;
-            padding-top: 6px;
-        }
-
-        .input {
-            display: flex;
-            border-top: 1px solid #1e293b;
-        }
-
-        input {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            outline: none;
-            background: #020617;
-            color: #e5e7eb;
-            font-size: 14px;
-        }
-
-        button {
-            padding: 0 16px;
-            background: #2563eb;
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-size: 16px;
-        }
-
-        button:hover {
-            background: #1d4ed8;
+        .app {
+        width: 420px;
+        height: 720px;
+        background: var(--bg-panel);
+        border-radius: 18px;
+        box-shadow: 0 0 40px rgba(0,0,0,.6);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
         }
     </style>
+
 </head>
 <body>
 
