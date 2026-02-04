@@ -1,23 +1,36 @@
 import { renderMessage, removeMessage } from "./render.js";
-import { sendToApi } from "./api.js";
+import { sendToBackend } from "./api.js";
 
-const input = document.getElementById("chatInput");
-const btn = document.getElementById("sendBtn");
+const input = document.getElementById("input");
+const sendBtn = document.getElementById("send");
 
-btn.onclick = send;
-input.onkeydown = e => e.key === "Enter" && send();
-
-async function send() {
+async function handleSend() {
   const text = input.value.trim();
   if (!text) return;
 
-  renderMessage("user", text);
   input.value = "";
 
-  const thinking = renderMessage("system", "⏳ Аналіз запиту…");
+  renderMessage("user", text);
 
-  const response = await sendToApi(text);
+  const loader = renderMessage("system", "⏳ Аналіз запиту...");
 
-  removeMessage(thinking);
-  renderMessage("assistant", response);
+  try {
+    const data = await sendToBackend(text);
+    removeMessage(loader);
+
+    if (data.cves) {
+      // дальше красиво карточками
+    } else {
+      renderMessage("bot", data.response);
+    }
+
+  } catch (err) {
+    removeMessage(loader);
+    renderMessage("error", "❌ Помилка зʼєднання з бекендом");
+  }
 }
+
+sendBtn.addEventListener("click", handleSend);
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter") handleSend();
+});

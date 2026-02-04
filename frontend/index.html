@@ -19,15 +19,30 @@
         <span class="status">● Connected</span>
       </header>
 
-      <main class="messages" id="messages"></main>
+      <main class="messages" id="messages">
+        <div class="cve-card critical">
+          <div class="cve-header">
+            <span class="severity-badge critical">CRITICAL</span>
+            <span class="cvss-badge">CVSS 10.0</span>
+          </div>
+
+          <div class="cve-id">CVE-2021-44228</div>
+
+          <div class="cve-description">
+            Log4Shell — уразливість віддаленого виконання коду в Apache Log4j.
+          </div>
+
+          <div class="cve-mitigation">
+            <span>🛠 Рекомендація:</span>
+            Оновити Log4j до версії 2.17.1 або вище.
+          </div>
+        </div>
+
+      </main>
 
       <footer class="input-area">
-        <input
-          id="chatInput"
-          placeholder="Введіть команду або запит…"
-          autocomplete="off"
-        />
-        <button id="sendBtn">➤</button>
+        <input id="input" placeholder="Введіть команду або запит…" />
+        <button id="send">▶</button>
       </footer>
 
     </div>
