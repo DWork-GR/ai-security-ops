@@ -13,6 +13,12 @@ from app.ai.expert_engine import analyze_alerts_expert
 from fastapi import Depends
 from sqlalchemy.orm import Session
 from app.database.db import get_db
+from app.database.repository import (
+    get_cve_by_id,
+    get_all_cves,
+    get_critical_cves
+)
+
 
 
 
@@ -26,40 +32,73 @@ def process_message(
 ):
     intent, entities = detect_intent(request.message)
 
+    # 1️⃣ Конкретная CVE
     if intent == "cve_lookup":
         cve_id = entities.get("cve_id")
-
-        if not cve_id:
-            return ChatResponse(
-                response="❌ Не вказано ідентифікатор CVE.",
-                intent=intent,
-                entities=entities
-            )
-
         cve = get_cve_by_id(db, cve_id)
 
         if not cve:
             return ChatResponse(
-                response=f"❌ Уразливість {cve_id} не знайдена у базі знань.",
+                response=f"❌ CVE {cve_id} не знайдено.",
                 intent=intent,
                 entities=entities
             )
 
-        response_text = (
-            f"🛡 {cve.id}\n"
-            f"CVSS: {cve.cvss}\n\n"
-            f"{cve.description}\n\n"
-            f"🔧 Mitigation:\n{cve.mitigation}"
+        return ChatResponse(
+            response=(
+                f"🛡 {cve.cve_id}\n"
+                f"CVSS: {cve.cvss} ({cve.severity})\n\n"
+                f"{cve.description}\n\n"
+                f"🔧 Mitigation:\n{cve.mitigation}"
+            ),
+            intent=intent,
+            entities=entities
         )
 
+    # 2️⃣ Все уязвимости
+    if intent == "list_cves":
+        cves = get_all_cves(db)
+
+        if not cves:
+            return ChatResponse(
+                response="ℹ️ База уразливостей порожня.",
+                intent=intent,
+                entities=entities
+            )
+
+        text = "📋 **Всі уразливості:**\n\n"
+        for cve in cves:
+            text += f"- {cve.cve_id} | CVSS {cve.cvss} | {cve.severity}\n"
+
         return ChatResponse(
-            response=response_text,
+            response=text,
+            intent=intent,
+            entities=entities
+        )
+
+    # 3️⃣ Критические
+    if intent == "critical_cves":
+        cves = get_critical_cves(db)
+
+        if not cves:
+            return ChatResponse(
+                response="✅ Критичних уразливостей не виявлено.",
+                intent=intent,
+                entities=entities
+            )
+
+        text = "🚨 **Критичні уразливості:**\n\n"
+        for cve in cves:
+            text += f"- {cve.cve_id} | CVSS {cve.cvss}\n"
+
+        return ChatResponse(
+            response=text,
             intent=intent,
             entities=entities
         )
 
     return ChatResponse(
-        response=f"ℹ️ Виявлено намір: {intent}",
+        response="ℹ️ Запит розпізнано, але обробка ще не реалізована.",
         intent=intent,
         entities=entities
     )
