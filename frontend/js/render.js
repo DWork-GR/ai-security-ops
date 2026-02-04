@@ -1,14 +1,14 @@
 const messagesEl = document.getElementById("messages");
 
 export function renderMessage(role, text) {
-  const div = document.createElement("div");
-  div.className = `message ${role}`;
-  div.textContent = text;
+  const msg = document.createElement("div");
+  msg.className = `message ${role}`;
+  msg.innerText = text;
 
-  messagesEl.appendChild(div);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  document.getElementById("chat").appendChild(msg);
+  msg.scrollIntoView({ behavior: "smooth" });
 
-  return div;
+  return msg;
 }
 
 export function removeMessage(el) {
