@@ -1,11 +1,23 @@
-document.getElementById("sendBtn").onclick = async () => {
-  const input = document.getElementById("userInput");
-  const text = input.value;
+import { renderMessage, removeMessage } from "./render.js";
+import { sendToApi } from "./api.js";
+
+const input = document.getElementById("chatInput");
+const btn = document.getElementById("sendBtn");
+
+btn.onclick = send;
+input.onkeydown = e => e.key === "Enter" && send();
+
+async function send() {
+  const text = input.value.trim();
+  if (!text) return;
+
+  renderMessage("user", text);
   input.value = "";
 
-  renderCard("⏳ Аналіз запиту", "Система обробляє дані…");
+  const thinking = renderMessage("system", "⏳ Аналіз запиту…");
 
-  const data = await sendToBackend(text);
+  const response = await sendToApi(text);
 
-  renderCard("📊 Результат", data.response);
-};
+  removeMessage(thinking);
+  renderMessage("assistant", response);
+}

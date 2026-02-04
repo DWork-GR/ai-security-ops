@@ -2,31 +2,40 @@
 <html lang="uk">
 <head>
   <meta charset="UTF-8" />
-  <title>AI Security Operations Assistant</title>
+  <title>AI SOC Console</title>
 
-  <link rel="stylesheet" href="css/base.css" />
-  <link rel="stylesheet" href="css/layout.css" />
-  <link rel="stylesheet" href="css/components.css" />
-  <link rel="stylesheet" href="css/effects.css" />
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/layout.css">
+  <link rel="stylesheet" href="styles/components.css">
+  <link rel="stylesheet" href="styles/input.css">
 </head>
-
 <body>
-  <div class="background"></div>
 
-  <div class="app-wrapper">
-    <div class="app">
-      <div class="header">AI SOC Console</div>
-      <div id="messages" class="messages"></div>
-      <div class="input-box">
-        <input id="userInput" placeholder="Введіть запит…" />
+  <div class="app-bg">
+    <div class="soc-console">
+
+      <header class="header">
+        <span class="title">AI SOC Console</span>
+        <span class="status">● Connected</span>
+      </header>
+
+      <main class="messages" id="messages"></main>
+
+      <footer class="input-area">
+        <input
+          id="chatInput"
+          placeholder="Введіть команду або запит…"
+          autocomplete="off"
+        />
         <button id="sendBtn">➤</button>
-      </div>
+      </footer>
+
     </div>
   </div>
 
   <script src="js/api.js"></script>
   <script src="js/render.js"></script>
   <script src="js/chat.js"></script>
-</body>
 
+</body>
 </html>

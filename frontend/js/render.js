@@ -1,11 +1,16 @@
-function renderCard(title, text, level = "") {
+const messagesEl = document.getElementById("messages");
+
+export function renderMessage(role, text) {
   const div = document.createElement("div");
-  div.className = `card ${level}`;
+  div.className = `message ${role}`;
+  div.textContent = text;
 
-  div.innerHTML = `
-    <div class="card-title">${title}</div>
-    <div class="card-text">${text}</div>
-  `;
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
 
-  document.getElementById("messages").appendChild(div);
+  return div;
+}
+
+export function removeMessage(el) {
+  el?.remove();
 }
