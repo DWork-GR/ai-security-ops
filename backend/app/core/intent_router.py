@@ -1,26 +1,36 @@
-from pydoc import text
 from app.nlp.regex_engine import extract_ip, extract_cve
 
 
 def detect_intent(message: str) -> tuple[str, dict]:
-    message_lower = message.lower()
+    text = message.lower()
 
     ip = extract_ip(message)
     cve = extract_cve(message)
 
-    if ip:
-        return "scan_ip", {"ip_address": ip}
+    # 🔹 Список усіх уразливостей
+    if (
+        ("покажи" in text or "показати" in text)
+        and ("уразлив" in text or "cve" in text)
+    ):
+        return "list_cves", {}
 
+    # 🔹 Критичні уразливості
+    if (
+        "критич" in text
+        and ("уразлив" in text or "cve" in text)
+    ):
+        return "critical_cves", {}
+
+    # 🔹 Конкретна CVE
     if cve:
         return "cve_lookup", {"cve_id": cve}
 
-    if any(word in message_lower for word in ["threat", "загрози", "attack"]):
+    # 🔹 IP → scan
+    if ip:
+        return "scan_ip", {"ip_address": ip}
+
+    # 🔹 Аналіз загроз
+    if any(word in text for word in ["threat", "загрози", "attack"]):
         return "analyze_threats", {}
 
     return "default", {}
-
-    if "покажи" in message_lower and "уразлив" in message_lower:
-        return "list_cves", {}
-
-    if "критич" in text and "уразлив" in text:
-        return "critical_cves", {}
