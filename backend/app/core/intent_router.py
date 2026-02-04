@@ -1,3 +1,4 @@
+from pydoc import text
 from app.nlp.regex_engine import extract_ip, extract_cve
 
 
@@ -17,3 +18,9 @@ def detect_intent(message: str) -> tuple[str, dict]:
         return "analyze_threats", {}
 
     return "default", {}
+
+    if "покажи" in message_lower and "уразлив" in message_lower:
+        return "list_cves", {}
+
+    if "критич" in text and "уразлив" in text:
+        return "critical_cves", {}
