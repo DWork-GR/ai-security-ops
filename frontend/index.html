@@ -1,100 +1,27 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-    <meta charset="UTF-8">
-    <title>AI Security Ops Chat</title>
-    <style>
-        :root {
-        --bg-main: #0b0f1a;
-        --bg-panel: #111827;
-        --bg-card: #0f172a;
+  <meta charset="UTF-8" />
+  <title>AI Security Operations Assistant</title>
 
-        --text-main: #e6eaf2;
-        --text-muted: #9aa4bf;
-
-        --critical: #ff4d4f;
-        --high: #fa8c16;
-        --medium: #fadb14;
-        --low: #52c41a;
-        --info: #1890ff;
-        }
-
-        body {
-        margin: 0;
-        font-family: 'Inter', system-ui, sans-serif;
-        background: radial-gradient(circle at top, #0e1629, var(--bg-main));
-        color: var(--text-main);
-        height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        }
-
-        .app {
-        width: 420px;
-        height: 720px;
-        background: var(--bg-panel);
-        border-radius: 18px;
-        box-shadow: 0 0 40px rgba(0,0,0,.6);
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        }
-    </style>
-
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/effects.css" />
 </head>
+
 <body>
-
-<div class="chat">
-    <div class="header">AI Security Operations Assistant</div>
-    <div class="messages" id="messages"></div>
-    <div class="input">
-        <input id="input" placeholder="Введіть запит..." />
-        <button onclick="sendMessage()">➤</button>
+  <div class="app">
+    <div class="header">AI SOC Console</div>
+    <div id="messages" class="messages"></div>
+    <div class="input-box">
+      <input id="userInput" placeholder="Введіть запит…" />
+      <button id="sendBtn">➤</button>
     </div>
-</div>
+  </div>
 
-<script>
-    const messages = document.getElementById("messages");
-    const input = document.getElementById("input");
-
-    function addMessage(text, sender) {
-        const div = document.createElement("div");
-        div.className = "message " + sender;
-        div.innerHTML = text;   // ← ВАЖНО
-        messages.appendChild(div);
-        messages.scrollTop = messages.scrollHeight;
-    }
-
-
-    async function sendMessage() {
-        const text = input.value.trim();
-        if (!text) return;
-
-        addMessage(text, "user");
-        input.value = "";
-
-        const thinkingMsg = addMessage("⏳ Аналіз запиту...", "bot");
-
-        try {
-            const response = await fetch("http://127.0.0.1:8000/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: text })
-            });
-
-            const data = await response.json();
-            addMessage(data.response, "bot");
-
-        } catch (err) {
-            thinkingMsg.textContent = "❌ Помилка з'єднання з сервером.";
-        }
-    }
-
-    input.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") sendMessage();
-    });
-</script>
-
+  <script src="js/api.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/chat.js"></script>
 </body>
 </html>
