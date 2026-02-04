@@ -32,3 +32,44 @@ body {
     linear-gradient(180deg, #020617, #020617);
   z-index: -1;
 }
+
+.input-box {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border-top: 1px solid #1e293b;
+  background: #020617;
+}
+
+.input-box input {
+  flex: 1;
+  height: 44px;
+  padding: 0 14px;
+  background: #020617;
+  border: 1px solid #1e293b;
+  border-radius: 12px 0 0 12px;
+  color: #e5e7eb;
+  font-size: 14px;
+  outline: none;
+}
+
+.input-box input::placeholder {
+  color: #64748b;
+}
+
+.input-box button {
+  height: 44px;
+  width: 46px;
+  background: linear-gradient(180deg, #2563eb, #1d4ed8);
+  border: 1px solid #1e293b;
+  border-left: none;
+  border-radius: 0 12px 12px 0;
+  color: white;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.input-box input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 1px #3b82f6;
+}
