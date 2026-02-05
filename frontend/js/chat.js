@@ -3,11 +3,21 @@ import { sendToBackend } from "./api.js";
 
 const input = document.getElementById("input");
 const sendBtn = document.getElementById("send");
+const form = document.getElementById("chat-form");
+
+if (!input || !sendBtn || !form) {
+  console.error("Chat DOM not found");
+}
+
+let busy = false;
 
 async function handleSend() {
+  if (busy) return;
+
   const text = input.value.trim();
   if (!text) return;
 
+  busy = true;
   input.value = "";
 
   renderMessage("user", text);
@@ -19,7 +29,7 @@ async function handleSend() {
     removeMessage(loader);
 
     if (data.cves) {
-      // дальше красиво карточками
+      // TODO: renderCveCards(data.cves)
     } else {
       renderMessage("bot", data.response);
     }
@@ -27,10 +37,12 @@ async function handleSend() {
   } catch (err) {
     removeMessage(loader);
     renderMessage("error", "❌ Помилка зʼєднання з бекендом");
+  } finally {
+    busy = false;
   }
 }
 
-sendBtn.addEventListener("click", handleSend);
-input.addEventListener("keydown", e => {
-  if (e.key === "Enter") handleSend();
+form.addEventListener("submit", e => {
+  e.preventDefault();
+  handleSend();
 });

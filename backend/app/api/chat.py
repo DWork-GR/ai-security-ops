@@ -77,29 +77,28 @@ def process_message(
         )
 
     # 3️⃣ Критические
-    if intent == "critical_cves":
-        cves = get_critical_cves(db)
+    if intent == "analyze_threats":
+        cves = get_critical_cves()
 
-        if not cves:
-            return ChatResponse(
-                response="✅ Критичних уразливостей не виявлено.",
-                intent=intent,
-                entities=entities
-            )
-
-        text = "🚨 **Критичні уразливості:**\n\n"
-        for cve in cves:
-            text += f"- {cve.cve_id} | CVSS {cve.cvss}\n"
-
+    if not cves:
         return ChatResponse(
-            response=text,
+            response="✅ Критичних загроз не виявлено.",
             intent=intent,
-            entities=entities
+            entities={}
+        )
+
+    # Формируем человекочитаемый ответ
+    lines = ["🚨 **Критичні загрози у системі:**\n"]
+
+    for cve in cves:
+        lines.append(
+            f"- {cve.cve_id} | CVSS {cve.cvss} | {cve.description}"
         )
 
     return ChatResponse(
-        response="ℹ️ Запит розпізнано, але обробка ще не реалізована.",
+        response="\n".join(lines),
         intent=intent,
-        entities=entities
-    )
+        entities={}
+    )   
+
 

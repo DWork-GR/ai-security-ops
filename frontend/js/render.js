@@ -5,8 +5,8 @@ export function renderMessage(role, text) {
   msg.className = `message ${role}`;
   msg.innerText = text;
 
-  document.getElementById("chat").appendChild(msg);
-  msg.scrollIntoView({ behavior: "smooth" });
+  messagesEl.appendChild(msg);
+  msg.scrollIntoView({ behavior: "smooth", block: "end" });
 
   return msg;
 }
@@ -15,8 +15,8 @@ export function removeMessage(el) {
   el?.remove();
 }
 
-function renderCves(cves) {
-  const container = document.getElementById("messages");
+export function renderCves(cves) {
+  const container = renderResultBlock("Уразливості");
 
   cves.forEach(cve => {
     const card = document.createElement("div");
@@ -31,11 +31,7 @@ function renderCves(cves) {
       </div>
 
       <div class="cve-id">${cve.cve_id}</div>
-
-      <div class="cve-description">
-        ${cve.description}
-      </div>
-
+      <div class="cve-description">${cve.description}</div>
       <div class="cve-mitigation">
         <span>🛠 Рекомендація:</span>
         ${cve.mitigation}
@@ -44,4 +40,18 @@ function renderCves(cves) {
 
     container.appendChild(card);
   });
+}
+
+
+export function renderResultBlock(title = "Результат") {
+  const block = document.createElement("div");
+  block.className = "result-block";
+
+  block.innerHTML = `
+    <div class="result-title">📊 ${title}</div>
+    <div class="result-content"></div>
+  `;
+
+  messagesEl.appendChild(block);
+  return block.querySelector(".result-content");
 }
