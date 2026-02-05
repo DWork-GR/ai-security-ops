@@ -6,17 +6,18 @@ export function renderMessage(role, text) {
   msg.innerText = text;
 
   messagesEl.appendChild(msg);
-  msg.scrollIntoView({ behavior: "smooth", block: "end" });
+  messagesEl.scrollTop = messagesEl.scrollHeight;
 
   return msg;
 }
+
 
 export function removeMessage(el) {
   el?.remove();
 }
 
 export function renderCves(cves) {
-  const container = renderResultBlock("Уразливості");
+  const container = document.getElementById("messages");
 
   cves.forEach(cve => {
     const card = document.createElement("div");
@@ -31,16 +32,20 @@ export function renderCves(cves) {
       </div>
 
       <div class="cve-id">${cve.cve_id}</div>
+
       <div class="cve-description">${cve.description}</div>
+
       <div class="cve-mitigation">
-        <span>🛠 Рекомендація:</span>
-        ${cve.mitigation}
+        🛠 ${cve.mitigation}
       </div>
     `;
 
     container.appendChild(card);
   });
+
+  container.scrollTop = container.scrollHeight;
 }
+
 
 
 export function renderResultBlock(title = "Результат") {

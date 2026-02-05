@@ -11,15 +11,14 @@ if (!input || !sendBtn || !form) {
 
 let busy = false;
 
-async function handleSend() {
-  if (busy) return;
+import { renderMessage, removeMessage, renderCves } from "./render.js";
+import { sendToBackend } from "./api.js";
 
+async function handleSend() {
   const text = input.value.trim();
   if (!text) return;
 
-  busy = true;
   input.value = "";
-
   renderMessage("user", text);
 
   const loader = renderMessage("system", "⏳ Аналіз запиту...");
@@ -30,17 +29,23 @@ async function handleSend() {
 
     if (data.type === "cves") {
       renderCves(data.cves);
-    } else {
+    } else if (data.type === "text") {
       renderMessage("bot", data.message);
+    } else {
+      renderMessage("error", "❌ Невідомий формат відповіді");
     }
 
   } catch (err) {
     removeMessage(loader);
     renderMessage("error", "❌ Помилка зʼєднання з бекендом");
-  } finally {
-    busy = false;
   }
 }
+
+sendBtn.onclick = handleSend;
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter") handleSend();
+});
+
 
 form.addEventListener("submit", e => {
   e.preventDefault();
