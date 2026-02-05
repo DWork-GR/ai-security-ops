@@ -28,12 +28,11 @@ async function handleSend() {
     const data = await sendToBackend(text);
     removeMessage(loader);
 
-    if (data.cves && data.cves.length > 0) {
+    if (data.type === "cves") {
       renderCves(data.cves);
-    } else if (data.response) {
-      renderMessage("bot", data.response);
+    } else {
+      renderMessage("bot", data.message);
     }
-
 
   } catch (err) {
     removeMessage(loader);
