@@ -1,3 +1,4 @@
+from typing import List, Optional
 from pydantic import BaseModel
 from typing import Optional
 
@@ -8,6 +9,6 @@ class ChatRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    response: str
     intent: str
-    entities: dict
+    response: Optional[str] = None
+    cves: Optional[List[dict]] = None

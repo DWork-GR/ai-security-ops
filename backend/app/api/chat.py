@@ -80,25 +80,19 @@ def process_message(
     if intent == "analyze_threats":
         cves = get_critical_cves()
 
-    if not cves:
-        return ChatResponse(
-            response="✅ Критичних загроз не виявлено.",
-            intent=intent,
-            entities={}
-        )
-
-    # Формируем человекочитаемый ответ
-    lines = ["🚨 **Критичні загрози у системі:**\n"]
-
-    for cve in cves:
-        lines.append(
-            f"- {cve.cve_id} | CVSS {cve.cvss} | {cve.description}"
-        )
-
     return ChatResponse(
-        response="\n".join(lines),
         intent=intent,
-        entities={}
-    )   
+        cves=[
+            {
+                "cve_id": c.cve_id,
+                "cvss": c.cvss,
+                "severity": c.severity,
+                "description": c.description,
+                "mitigation": c.mitigation
+            }
+            for c in cves
+        ],
+        response=None
+    )
 
 
