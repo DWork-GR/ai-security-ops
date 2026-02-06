@@ -1,8 +1,7 @@
-import { renderMessage, removeMessage } from "./render.js";
+import { renderMessage, removeMessage, renderCves } from "./render.js";
 import { sendToBackend } from "./api.js";
 
-const input = document.getElementById("input");
-const sendBtn = document.getElementById("send");
+const input = document.getElementById("chat-input");
 const form = document.getElementById("chat-form");
 
 if (!input || !sendBtn || !form) {

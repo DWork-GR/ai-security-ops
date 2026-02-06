@@ -6,7 +6,7 @@ export function renderMessage(role, text) {
   msg.innerText = text;
 
   messagesEl.appendChild(msg);
-  messagesEl.scrollTop = messagesEl.scrollHeight;
+  msg.scrollIntoView({ behavior: "smooth" });
 
   return msg;
 }
@@ -25,26 +25,23 @@ export function renderCves(cves) {
 
     card.innerHTML = `
       <div class="cve-header">
-        <span class="severity-badge ${cve.severity.toLowerCase()}">
-          ${cve.severity}
-        </span>
+        <span class="severity-badge ${cve.severity.toLowerCase()}">${cve.severity}</span>
         <span class="cvss-badge">CVSS ${cve.cvss}</span>
       </div>
 
       <div class="cve-id">${cve.cve_id}</div>
-
       <div class="cve-description">${cve.description}</div>
 
       <div class="cve-mitigation">
-        🛠 ${cve.mitigation}
+        <span>🛠 Рекомендація:</span>
+        ${cve.mitigation}
       </div>
     `;
 
     container.appendChild(card);
   });
-
-  container.scrollTop = container.scrollHeight;
 }
+
 
 
 
