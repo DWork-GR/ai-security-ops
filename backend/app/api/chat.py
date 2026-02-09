@@ -18,12 +18,19 @@ def process_message(
     db: Session = Depends(get_db)
 ):
     try:
-        message = request.message.lower()
+        # нормалізуємо повідомлення
+        message = request.message.strip().lower()
         intent, entities = detect_intent(message)
 
-        # 🔹 Критичні загрози
+        # 🔹 КРИТИЧНІ ЗАГРОЗИ
         if intent == "analyze_threats":
-            cves = get_critical_cves(db)
+            cves = get_critical_cves(db) or []
+
+            if not cves:
+                return {
+                    "type": "text",
+                    "message": "ℹ️ Критичних вразливостей не знайдено."
+                }
 
             return {
                 "type": "cves",
@@ -31,38 +38,39 @@ def process_message(
                     {
                         "cve_id": c.cve_id,
                         "cvss": c.cvss,
-                        "severity": c.severity,
-                        "description": c.description,
-                        "mitigation": c.mitigation
+                        "severity": c.severity or "UNKNOWN",
+                        "description": c.description or "Опис відсутній",
+                        "mitigation": c.mitigation or "Рекомендації відсутні"
                     }
                     for c in cves
                 ]
             }
-            except Exception as e:
-                print("CHAT ERROR:", e)
-                return {
-                    "type": "text",
-                    "message": "❌ Помилка на сервері"
-            }
 
-        # 🔹 Конкретна CVE
+        # 🔹 ПОШУК CVE
         if intent == "cve_lookup":
             cve_id = entities.get("cve_id")
+
+            if not cve_id:
+                return {
+                    "type": "text",
+                    "message": "❌ Не вказано CVE ідентифікатор."
+                }
+
             cve = get_cve_by_id(db, cve_id)
 
             if not cve:
                 return {
                     "type": "text",
-                    "message": f"❌ CVE {cve_id} не знайдено."
+                    "message": f"❌ CVE **{cve_id}** не знайдено."
                 }
 
             return {
                 "type": "text",
                 "message": (
-                    f"{cve.cve_id}\n"
-                    f"CVSS {cve.cvss} ({cve.severity})\n\n"
+                    f"**{cve.cve_id}**\n"
+                    f"CVSS: {cve.cvss} ({cve.severity})\n\n"
                     f"{cve.description}\n\n"
-                    f"{cve.mitigation}"
+                    f"🛠 **Рекомендація:**\n{cve.mitigation}"
                 )
             }
 
@@ -78,10 +86,9 @@ def process_message(
             )
         }
 
-
     except Exception as e:
         print("CHAT ERROR:", e)
         return {
             "type": "text",
-            "message": "❌ Помилка на сервері"
+            "message": "❌ Помилка на сервері. Перевір логи."
         }
