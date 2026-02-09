@@ -14,14 +14,11 @@ def get_all_cves(db: Session):
 
 
 
-def get_critical_cves():
-    db: Session = SessionLocal()
-    try:
-        return (
-            db.query(CVE)
-            .filter(CVE.severity == "CRITICAL")
+def get_critical_cves(db: Session):
+    return (
+        db.query(CVE)
+        .filter(CVE.severity == "CRITICAL")
             .order_by(CVE.cvss.desc())
             .all()
         )
-    finally:
-        db.close()
+
