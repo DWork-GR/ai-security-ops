@@ -1,19 +1,17 @@
 import { renderMessage, removeMessage, renderCves } from "./render.js";
 import { sendToBackend } from "./api.js";
 
-const input = document.getElementById("chat-input");
+const input = document.getElementById("input");
 const form = document.getElementById("chat-form");
+const sendBtn = document.getElementById("send-btn");
 
 if (!input || !sendBtn || !form) {
-  console.error("Chat DOM not found");
+  console.error("Chat DOM not found", { input, sendBtn, form });
 }
 
-let busy = false;
-
-import { renderMessage, removeMessage, renderCves } from "./render.js";
-import { sendToBackend } from "./api.js";
-
 async function handleSend() {
+  console.log("HANDLE SEND CALLED");
+
   const text = input.value.trim();
   if (!text) return;
 
@@ -33,7 +31,6 @@ async function handleSend() {
     } else {
       renderMessage("error", "❌ Невідомий формат відповіді");
     }
-
   } catch (err) {
     removeMessage(loader);
     renderMessage("error", "❌ Помилка зʼєднання з бекендом");
@@ -41,10 +38,6 @@ async function handleSend() {
 }
 
 sendBtn.onclick = handleSend;
-input.addEventListener("keydown", e => {
-  if (e.key === "Enter") handleSend();
-});
-
 
 form.addEventListener("submit", e => {
   e.preventDefault();

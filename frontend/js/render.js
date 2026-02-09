@@ -3,7 +3,10 @@ const messagesEl = document.getElementById("messages");
 export function renderMessage(role, text) {
   const msg = document.createElement("div");
   msg.className = `message ${role}`;
-  msg.innerText = text;
+  msg.innerHTML = text
+  .replace(/\n/g, "<br>")
+  .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+
 
   messagesEl.appendChild(msg);
   msg.scrollIntoView({ behavior: "smooth" });
