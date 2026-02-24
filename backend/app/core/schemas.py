@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ChatRequest(BaseModel):
@@ -25,6 +25,40 @@ class OpenVASScanResponse(BaseModel):
     status: str
 
 
+class OpenVASActiveScanRequest(BaseModel):
+    target: str
+    ports: Optional[List[int]] = None
+    timeout_ms: int = Field(default=250, ge=50, le=3000)
+
+
+class OpenVASFindingOut(BaseModel):
+    port: int
+    protocol: str
+    service: str
+    severity: str
+    risk_score: float
+    cvss_max: float
+    cve_references: List[str]
+    summary_en: str
+    summary_uk: str
+
+
+class OpenVASActiveScanResponse(BaseModel):
+    task_id: str
+    target: str
+    status: str
+    scan_profile: str
+    scanned_ports: int
+    open_ports: List[int]
+    duration_ms: int
+    findings: List[OpenVASFindingOut]
+    incidents_created: int
+    incidents_updated: int
+    baseline_scan_task_id: Optional[str] = None
+    new_open_ports: List[int] = Field(default_factory=list)
+    closed_open_ports: List[int] = Field(default_factory=list)
+
+
 class SnortAlertIn(BaseModel):
     message: str
     priority: int
@@ -44,7 +78,147 @@ class IncidentOut(BaseModel):
     severity: str
     status: str
     detected_at: datetime
+    risk_score: float
+    asset: Optional[str] = None
 
 
 class IncidentListResponse(BaseModel):
     items: List[IncidentOut]
+
+
+class IncidentStatusUpdateRequest(BaseModel):
+    status: str = Field(..., description="new|triaged|investigating|mitigated|closed|false_positive")
+
+
+class IncidentStatusUpdateResponse(BaseModel):
+    item: IncidentOut
+
+
+class IncidentAuditLogOut(BaseModel):
+    id: str
+    action: str
+    old_status: Optional[str] = None
+    new_status: Optional[str] = None
+    actor_role: str
+    actor_id: Optional[str] = None
+    details: Optional[str] = None
+    created_at: datetime
+
+
+class IncidentAuditLogListResponse(BaseModel):
+    items: List[IncidentAuditLogOut]
+
+
+class IncidentSummaryStatsResponse(BaseModel):
+    total_incidents: int
+    open_incidents: int
+    critical_open_incidents: int
+    incidents_last_24h: int
+    by_status: Dict[str, int]
+    by_severity: Dict[str, int]
+    by_source: Dict[str, int]
+
+
+class OperationsReportResponse(BaseModel):
+    generated_at: datetime
+    report_en: str
+    report_uk: str
+
+
+class CVEOut(BaseModel):
+    cve_id: str
+    cvss: float
+    severity: str
+    description: str
+    mitigation: str
+
+
+class CVEListResponse(BaseModel):
+    total: int
+    items: List[CVEOut]
+
+
+class ErrorEventOut(BaseModel):
+    id: str
+    source: str
+    operation: str
+    error_type: str
+    message: str
+    severity: str
+    fingerprint: str
+    occurrences: int
+    context: Optional[str] = None
+    first_seen_at: datetime
+    last_seen_at: datetime
+
+
+class ErrorEventListResponse(BaseModel):
+    items: List[ErrorEventOut]
+
+
+class ErrorSummaryStatsResponse(BaseModel):
+    total_errors: int
+    errors_last_24h: int
+    total_occurrences: int
+    by_severity: Dict[str, int]
+    by_source: Dict[str, int]
+    by_type: Dict[str, int]
+
+
+class AssetUpsertRequest(BaseModel):
+    ip: str
+    hostname: Optional[str] = None
+    owner: Optional[str] = None
+    business_unit: Optional[str] = None
+    criticality: Optional[str] = None
+    environment: Optional[str] = None
+    tags: Optional[str] = None
+
+
+class AssetOut(BaseModel):
+    id: str
+    ip: str
+    hostname: Optional[str] = None
+    owner: Optional[str] = None
+    business_unit: Optional[str] = None
+    criticality: str
+    environment: str
+    tags: Optional[str] = None
+    first_seen_at: datetime
+    last_seen_at: datetime
+
+
+class AssetListResponse(BaseModel):
+    items: List[AssetOut]
+
+
+class ScanRunOut(BaseModel):
+    task_id: str
+    target_ip: str
+    scan_profile: str
+    status: str
+    scanned_ports: int
+    open_ports_count: int
+    duration_ms: int
+    started_at: datetime
+    finished_at: datetime
+    open_ports: List[int]
+
+
+class ScanRunListResponse(BaseModel):
+    items: List[ScanRunOut]
+
+
+class NvdImportRequest(BaseModel):
+    file_path: str = Field(..., description="Path to local NVD JSON file")
+    default_mitigation: str = Field(
+        default="Review vendor advisory, apply patches, and validate mitigations.",
+        description="Fallback mitigation text when feed has no remediation guidance",
+    )
+
+
+class NvdImportResponse(BaseModel):
+    imported_total: int
+    created: int
+    updated: int
+    skipped: int

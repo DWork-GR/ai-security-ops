@@ -2,46 +2,37 @@
 
 Base URL: `/`
 
-## 1) Chat Endpoint (UI helper, not core integration endpoint)
+## 1) Chat Endpoint
 
 ### `POST /chat`
 Request:
 ```json
 {
-  "message": "show critical cves"
+  "message": "scan 127.0.0.1"
 }
 ```
 
-Response (`type=text`):
-```json
-{
-  "type": "text",
-  "message": "Human-readable answer"
-}
-```
+Response variants:
+- `{"type":"text","message":"..."}`
+- `{"type":"cves","cves":[...]}`
 
-Response (`type=cves`):
-```json
-{
-  "type": "cves",
-  "cves": [
-    {
-      "cve_id": "CVE-2021-44228",
-      "cvss": 10.0,
-      "severity": "CRITICAL",
-      "description": "Description",
-      "mitigation": "Action"
-    }
-  ]
-}
-```
+Supported commands include:
+- `show cves`
+- `show critical cves`
+- `search cve apache`
+- `scan 127.0.0.1`
+- `show incidents`
+- `incident stats`
+- `show errors`
+- `error stats`
+- `analyze threats`
 
-## 2) Snort Integration
+## 2) Integration Endpoints
 
-### `POST /integrations/snort/alerts`
 Headers:
 - `X-API-Key: <shared_key>` (required when `INTEGRATION_API_KEY` is configured)
 
+### `POST /integrations/snort/alerts`
 Request:
 ```json
 {
@@ -66,12 +57,7 @@ Response:
 }
 ```
 
-## 3) OpenVAS Integration
-
 ### `POST /integrations/openvas/scan`
-Headers:
-- `X-API-Key: <shared_key>` (required when `INTEGRATION_API_KEY` is configured)
-
 Request:
 ```json
 {
@@ -88,32 +74,126 @@ Response:
 }
 ```
 
-## 4) Incident Query
+### `POST /integrations/openvas/scan/active`
+Request:
+```json
+{
+  "target": "127.0.0.1",
+  "ports": [22, 80, 443],
+  "timeout_ms": 120
+}
+```
+
+Response:
+```json
+{
+  "task_id": "uuid",
+  "target": "127.0.0.1",
+  "status": "completed",
+  "scan_profile": "tcp-custom",
+  "scanned_ports": 3,
+  "open_ports": [80],
+  "duration_ms": 64,
+  "findings": [
+    {
+      "port": 80,
+      "protocol": "tcp",
+      "service": "http",
+      "severity": "CRITICAL",
+      "risk_score": 95,
+      "cvss_max": 10,
+      "cve_references": ["CVE-2021-44228"],
+      "summary_en": "...",
+      "summary_uk": "..."
+    }
+  ],
+  "incidents_created": 1,
+  "incidents_updated": 0
+}
+```
+
+## 3) Incident Endpoints
+
+Headers for incident/report/knowledge/error endpoints when RBAC enabled:
+- `X-User-Key: <analyst|manager|admin key>`
 
 ### `GET /incidents`
+Filters:
+- `limit`, `source`, `severity`, `status`, `search`, `min_risk`, `date_from`, `date_to`
+
+### `PATCH /incidents/{incident_id}/status`
+Request:
+```json
+{
+  "status": "triaged"
+}
+```
+
+### `GET /incidents/{incident_id}/audit`
+Response includes status transitions and actor role.
+
+### `GET /incidents/stats/summary`
+Returns operational KPI counters by status/severity/source.
+
+## 4) Knowledge Base Endpoints
+
+### `GET /knowledge/cves/search`
+Filters:
+- `q`, `severity`, `min_cvss`, `limit`
+
+Response:
+```json
+{
+  "total": 2,
+  "items": [
+    {
+      "cve_id": "CVE-2021-44228",
+      "cvss": 10,
+      "severity": "CRITICAL",
+      "description": "...",
+      "mitigation": "..."
+    }
+  ]
+}
+```
+
+### `GET /knowledge/cves/{cve_id}`
+Returns one CVE record.
+
+## 5) Error Intelligence Endpoints
+
+### `GET /errors`
+Filters:
+- `limit`, `source`, `severity`, `error_type`, `search`
+
 Response:
 ```json
 {
   "items": [
     {
       "id": "uuid",
-      "source": "snort",
+      "source": "openvas",
+      "operation": "active_scan",
+      "error_type": "RuntimeError",
+      "message": "scan backend unavailable",
       "severity": "HIGH",
-      "status": "new",
-      "detected_at": "2026-02-24T12:00:00Z"
+      "fingerprint": "sha256...",
+      "occurrences": 3,
+      "context": "target=127.0.0.1",
+      "first_seen_at": "2026-02-24T12:00:00Z",
+      "last_seen_at": "2026-02-24T12:10:00Z"
     }
   ]
 }
 ```
 
-## 5) Error Contract
+### `GET /errors/stats/summary`
+Manager/admin endpoint with total errors, total occurrences, last-24h counters, and groupings.
 
-All validation errors:
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Details"
-  }
-}
-```
+## 6) Report Endpoints
+
+### `GET /reports/operations`
+Returns bilingual EN/UK operations summary with incident and error metrics.
+
+### `GET /reports/operations/markdown`
+Returns export-ready markdown (`text/plain`).

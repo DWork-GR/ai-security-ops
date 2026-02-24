@@ -4,11 +4,12 @@ import { sendToBackend } from "./api.js";
 const input = document.getElementById("input");
 const form = document.getElementById("chat-form");
 const sendBtn = document.getElementById("send-btn");
+const quickActionsEl = document.getElementById("quick-actions");
 
-async function handleSend() {
+async function handleSend(forcedText = null) {
   if (!input) return;
 
-  const text = input.value.trim();
+  const text = (forcedText ?? input.value).trim();
   if (!text) return;
 
   input.value = "";
@@ -44,5 +45,15 @@ if (form) {
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     handleSend();
+  });
+}
+
+if (quickActionsEl) {
+  quickActionsEl.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const prompt = target.dataset.prompt;
+    if (!prompt) return;
+    handleSend(prompt);
   });
 }

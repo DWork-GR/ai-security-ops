@@ -15,6 +15,8 @@ if str(BACKEND_DIR) not in sys.path:
 os.environ["DATABASE_URL"] = f"sqlite:///{TEST_DB_PATH.as_posix()}"
 os.environ["GEMINI_API_KEY"] = ""
 os.environ["LLM_PROVIDER"] = "none"
+os.environ["RBAC_ENABLED"] = "false"
+os.environ["RBAC_KEYS"] = ""
 
 from app.database.db import Base, engine  # noqa: E402
 from app.database.seed_cves import seed as seed_cves  # noqa: E402

@@ -47,3 +47,6 @@ OLLAMA_BASE_URL = os.getenv(
     "http://127.0.0.1:11434",
 ).rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b").strip()
+OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "").strip()
+RBAC_KEYS = os.getenv("RBAC_KEYS", "").strip()
+RBAC_ENABLED = os.getenv("RBAC_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"} or bool(RBAC_KEYS)

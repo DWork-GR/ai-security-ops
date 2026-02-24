@@ -10,18 +10,23 @@ Core value: normalize and correlate security data from external tools
 1. API Layer (FastAPI)
 - Exposes ingestion and query endpoints.
 - Handles auth, validation, and response contracts.
+- Enforces optional RBAC with analyst/manager/admin roles.
 
 2. Integration Adapters
 - `integrations/snort/*`: parse incoming or file-based Snort alerts.
-- `integrations/openvas/*`: create scan tasks and process scan results.
+- `integrations/openvas/*`: create scan tasks and execute active TCP scan profile.
 
 3. Domain Services
 - Incident creation and deduplication.
 - Threat analysis orchestration (rule-based and LLM-assisted).
+- Correlation v2 using signature + asset inference + severity escalation.
+- Scan service maps open services to KB CVEs and creates incidents.
+- Error service fingerprints backend failures for operational troubleshooting.
 
 4. Persistence Layer (PostgreSQL via SQLAlchemy)
-- Stores CVEs, incidents, and analysis results.
+- Stores CVEs, incidents, analysis results, and error events.
 - Designed for deterministic queries and report generation.
+- Stores incident audit trail for lifecycle accountability.
 
 5. Presentation Layer
 - Web UI can call chat-style endpoint.
@@ -38,6 +43,8 @@ Current entities:
 - `CVE`
 - `Incident`
 - `AnalysisResult`
+- `IncidentAuditLog`
+- `ErrorEvent`
 
 Target additions (next iterations):
 - `IntegrationEvent` (raw event envelope)
@@ -63,6 +70,7 @@ OpenVAS:
 - Output sanitization on frontend and structured responses on backend.
 - Input validation on all integration endpoints.
 - Auditable incident lifecycle states: `new`, `triaged`, `mitigated`, `closed`.
+- Manager-grade reporting endpoint for exportable operations summaries.
 
 ### 7. Defense Narrative
 On defense day, demonstrate:

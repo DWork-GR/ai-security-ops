@@ -31,6 +31,14 @@
   color: #22c55e;
 }
 
+.quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+
 .messages {
   flex: 1;
   padding: 16px;

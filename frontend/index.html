@@ -19,10 +19,22 @@
         <span class="status">Connected</span>
       </header>
 
+      <section class="quick-actions" id="quick-actions">
+        <button type="button" class="quick-action" data-prompt="допомога">Допомога</button>
+        <button type="button" class="quick-action" data-prompt="повна перевірка 127.0.0.1">Повна Перевірка</button>
+        <button type="button" class="quick-action" data-prompt="покажи критичні cve">Критичні CVE</button>
+        <button type="button" class="quick-action" data-prompt="покажи інциденти">Інциденти</button>
+        <button type="button" class="quick-action" data-prompt="статистика інцидентів">Статистика SOC</button>
+        <button type="button" class="quick-action" data-prompt="покажи помилки">Помилки</button>
+        <button type="button" class="quick-action" data-prompt="аналіз загроз">Аналіз Загроз</button>
+        <button type="button" class="quick-action" data-prompt="статус системи">Статус Системи</button>
+        <button type="button" class="quick-action" data-prompt="план розвитку">План Розвитку</button>
+      </section>
+
       <main class="messages" id="messages"></main>
 
       <form class="input-area" id="chat-form">
-        <input id="input" placeholder="Enter command or query..." />
+        <input id="input" placeholder="Приклад: допомога, повна перевірка 127.0.0.1, пошук cve apache" />
         <button type="submit" id="send-btn">Send</button>
       </form>
     </div>

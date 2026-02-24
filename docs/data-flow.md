@@ -28,6 +28,11 @@
 - UI and/or API consumer gets structured result
 - Incident state persisted for reporting
 
+8. Governance:
+- Role-based access checks for incident/report endpoints.
+- Status transitions are written to audit log with actor role.
+- Runtime exceptions are fingerprinted and stored in `error_events`.
+
 ### 2. Event Envelope (Unified)
 
 ```json
@@ -57,5 +62,6 @@ Rule 3:
 ### 4. Failure Paths
 
 - Invalid payload -> `400` with validation details.
-- Dependency outage (DB/LLM) -> `503` with fallback message.
+- Dependency outage (DB/LLM/scanner) -> `5xx` with fallback message.
 - Partial integration result -> persist what is available, mark status `needs_review`.
+- Error search APIs (`/errors`, `/errors/stats/summary`) provide troubleshooting visibility.
