@@ -1,25 +1,22 @@
-import os
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-from dotenv import load_dotenv
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-load_dotenv()
+from app.config import DATABASE_URL
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+DB_ECHO = False
 
 engine = create_engine(
     DATABASE_URL,
-    echo=True,
-    future=True
+    echo=DB_ECHO,
+    future=True,
 )
 
 SessionLocal = sessionmaker(
     bind=engine,
     autoflush=False,
-    autocommit=False
+    autocommit=False,
 )
 
-# 🔥 ВАЖНО: Base ОБЯЗАТЕЛЬНО здесь
 Base = declarative_base()
 
 

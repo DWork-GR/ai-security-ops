@@ -1,27 +1,42 @@
 def analyze_alerts_expert(alerts: list[str]) -> str:
-    analysis = []
+    if not alerts:
+        return "No critical threats were detected."
+
+    findings = []
     recommendations = []
 
     for alert in alerts:
-        if "SQL Injection" in alert:
-            analysis.append(
-                "Виявлено ознаки <b>SQL Injection</b> — атаки на рівні прикладної логіки."
+        alert_lower = alert.lower()
+        if "sql injection" in alert_lower:
+            findings.append("SQL injection pattern detected in IDS traffic.")
+            recommendations.extend(
+                [
+                    "Block suspicious source IP addresses at the edge firewall.",
+                    "Review web access logs and WAF events for matching timestamps.",
+                    "Enforce parameterized queries in affected applications.",
+                ]
             )
-            recommendations.extend([
-                "Тимчасово обмежити доступ з підозрілих IP",
-                "Перевірити журнали доступу веб-сервера",
-                "Оновити ORM або фільтрацію введення"
-            ])
+        elif "port scan" in alert_lower:
+            findings.append("Reconnaissance activity detected (port scan).")
+            recommendations.extend(
+                [
+                    "Apply rate-limiting and temporary deny-list for scanner IPs.",
+                    "Verify exposed services and close unused ports.",
+                ]
+            )
+        else:
+            findings.append(f"Critical IDS alert: {alert}")
+            recommendations.append("Escalate to SOC analyst for triage.")
 
-    if not analysis:
-        return "<b>Критичних загроз не виявлено.</b>"
+    unique_recommendations = sorted(set(recommendations))
 
-    result = "<b>📊 Аналітичний висновок (експертна система):</b><br><br>"
-    for a in analysis:
-        result += f"• {a}<br>"
+    lines = ["SOC analysis summary:"]
+    for finding in findings:
+        lines.append(f"- {finding}")
 
-    result += "<br><b>🔧 Рекомендації:</b><br>"
-    for r in set(recommendations):
-        result += f"• {r}<br>"
+    lines.append("")
+    lines.append("Recommended actions:")
+    for recommendation in unique_recommendations:
+        lines.append(f"- {recommendation}")
 
-    return result
+    return "\n".join(lines)

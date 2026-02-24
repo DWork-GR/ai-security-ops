@@ -1,62 +1,77 @@
 const messagesEl = document.getElementById("messages");
 
+function appendAndScroll(el) {
+  messagesEl.appendChild(el);
+  el.scrollIntoView({ behavior: "smooth" });
+}
+
 export function renderMessage(role, text) {
   const msg = document.createElement("div");
   msg.className = `message ${role}`;
-  msg.innerHTML = text
-  .replace(/\n/g, "<br>")
-  .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-
-
-  messagesEl.appendChild(msg);
-  msg.scrollIntoView({ behavior: "smooth" });
-
+  msg.textContent = text;
+  appendAndScroll(msg);
   return msg;
 }
 
-
 export function removeMessage(el) {
-  el?.remove();
+  if (el) {
+    el.remove();
+  }
 }
 
 export function renderCves(cves) {
-  const container = document.getElementById("messages");
-
-  cves.forEach(cve => {
+  cves.forEach((cve) => {
     const card = document.createElement("div");
-    card.className = `cve-card ${cve.severity.toLowerCase()}`;
+    card.className = `cve-card ${String(cve.severity || "unknown").toLowerCase()}`;
 
-    card.innerHTML = `
-      <div class="cve-header">
-        <span class="severity-badge ${cve.severity.toLowerCase()}">${cve.severity}</span>
-        <span class="cvss-badge">CVSS ${cve.cvss}</span>
-      </div>
+    const header = document.createElement("div");
+    header.className = "cve-header";
 
-      <div class="cve-id">${cve.cve_id}</div>
-      <div class="cve-description">${cve.description}</div>
+    const severityBadge = document.createElement("span");
+    severityBadge.className = `severity-badge ${String(cve.severity || "unknown").toLowerCase()}`;
+    severityBadge.textContent = String(cve.severity || "UNKNOWN");
 
-      <div class="cve-mitigation">
-        <span>🛠 Рекомендація:</span>
-        ${cve.mitigation}
-      </div>
-    `;
+    const cvssBadge = document.createElement("span");
+    cvssBadge.className = "cvss-badge";
+    cvssBadge.textContent = `CVSS ${cve.cvss}`;
 
-    container.appendChild(card);
+    header.appendChild(severityBadge);
+    header.appendChild(cvssBadge);
+
+    const cveId = document.createElement("div");
+    cveId.className = "cve-id";
+    cveId.textContent = cve.cve_id || "Unknown CVE";
+
+    const description = document.createElement("div");
+    description.className = "cve-description";
+    description.textContent = cve.description || "No description";
+
+    const mitigation = document.createElement("div");
+    mitigation.className = "cve-mitigation";
+    mitigation.textContent = `Mitigation: ${cve.mitigation || "Not provided"}`;
+
+    card.appendChild(header);
+    card.appendChild(cveId);
+    card.appendChild(description);
+    card.appendChild(mitigation);
+
+    appendAndScroll(card);
   });
 }
 
-
-
-
-export function renderResultBlock(title = "Результат") {
+export function renderResultBlock(title = "Result") {
   const block = document.createElement("div");
   block.className = "result-block";
 
-  block.innerHTML = `
-    <div class="result-title">📊 ${title}</div>
-    <div class="result-content"></div>
-  `;
+  const titleEl = document.createElement("div");
+  titleEl.className = "result-title";
+  titleEl.textContent = title;
 
-  messagesEl.appendChild(block);
-  return block.querySelector(".result-content");
+  const content = document.createElement("div");
+  content.className = "result-content";
+
+  block.appendChild(titleEl);
+  block.appendChild(content);
+  appendAndScroll(block);
+  return content;
 }

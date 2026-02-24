@@ -42,7 +42,7 @@ def seed():
     db.commit()
     db.close()
 
-    print("✅ CVE data seeded successfully")
+    print("CVE data seeded successfully")
 
 
 if __name__ == "__main__":

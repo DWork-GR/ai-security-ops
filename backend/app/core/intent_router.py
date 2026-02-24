@@ -1,36 +1,38 @@
-from app.nlp.regex_engine import extract_ip, extract_cve
+from app.nlp.regex_engine import extract_cve, extract_ip
 
 
 def detect_intent(message: str) -> tuple[str, dict]:
-    text = message.lower()
+    text = message.lower().strip()
+    ip_address = extract_ip(message)
+    cve_id = extract_cve(message)
 
-    ip = extract_ip(message)
-    cve = extract_cve(message)
+    if cve_id:
+        return "cve_lookup", {"cve_id": cve_id.upper()}
 
-    # 🔹 Список усіх уразливостей
+    if ip_address and any(
+        keyword in text
+        for keyword in ["scan", "scan ip", "scan target"]
+    ):
+        return "scan_ip", {"ip_address": ip_address}
+
+    if "critical" in text and "cve" in text:
+        return "critical_cves", {}
+
     if (
-        ("покажи" in text or "показати" in text)
-        and ("уразлив" in text or "cve" in text)
+        "show cves" in text
+        or "list cves" in text
+        or "all cves" in text
     ):
         return "list_cves", {}
 
-    # 🔹 Критичні уразливості
-    if (
-        "критич" in text
-        and ("уразлив" in text or "cve" in text)
+    if any(
+        keyword in text
+        for keyword in [
+            "analyze threats",
+            "threat analysis",
+            "ids analysis",
+        ]
     ):
-        return "critical_cves", {}
-
-    # 🔹 Конкретна CVE
-    if cve:
-        return "cve_lookup", {"cve_id": cve}
-
-    # 🔹 IP → scan
-    if ip:
-        return "scan_ip", {"ip_address": ip}
-
-    # 🔹 Аналіз загроз
-    if any(word in text for word in ["threat", "загрози", "attack"]):
         return "analyze_threats", {}
 
     return "default", {}

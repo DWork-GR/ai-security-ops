@@ -20,10 +20,16 @@ def parse_alerts():
         priority_line = lines[1]
 
         if "Priority" in priority_line:
-            priority = int(priority_line.split(":")[1].strip(" ]"))
-            alerts.append({
-                "message": message,
-                "priority": priority
-            })
+            try:
+                priority = int(priority_line.split(":")[1].strip(" ]"))
+            except (ValueError, IndexError):
+                continue
+
+            alerts.append(
+                {
+                    "message": message,
+                    "priority": priority,
+                }
+            )
 
     return alerts

@@ -33,6 +33,15 @@
   opacity: 0.8;
 }
 
+.message.error {
+  align-self: center;
+  background: rgba(185, 28, 28, 0.18);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: #fecaca;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
 .cve-card {
   background: rgba(15, 23, 42, 0.75);
   border: 1px solid rgba(148, 163, 184, 0.15);
