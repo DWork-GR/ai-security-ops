@@ -149,3 +149,59 @@ Steps:
 Expected:
 - Error entry is persisted with source, operation, type, and occurrence count.
 - Stats endpoint reports at least one error event.
+
+### AT-16: Nmap active discovery integration
+Steps:
+1. Call `POST /integrations/nmap/scan/active` for `127.0.0.1` with custom ports.
+2. Check response fields and incidents list.
+
+Expected:
+- `200 OK`.
+- Response contains `scanner="nmap"`, `discovery_engine`, `open_ports`, and baseline diff fields.
+- At least one incident is created or updated with source `nmap`.
+
+### AT-17: Outbound delivery retry (Telegram + GitHub)
+Preconditions:
+- `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `GITHUB_TOKEN`, `GITHUB_REPO` are configured.
+- Outbound transport is temporarily flaky.
+
+Steps:
+1. Create critical incident (for example via `POST /integrations/snort/alerts` with priority 1).
+2. Inspect `GET /outbound/events`.
+
+Expected:
+- One event per channel (`telegram`, `github`).
+- Status becomes `sent` after retries.
+- `attempts >= 2` when first delivery attempt fails.
+
+### AT-18: Outbound idempotency
+Steps:
+1. Trigger same outbound event key for same channel twice.
+2. Inspect `GET /outbound/events`.
+
+Expected:
+- Only one stored outbound event for that channel/event key fingerprint.
+- No duplicate Telegram message / GitHub issue from the same idempotency key.
+
+### AT-19: Scan job queue lifecycle
+Steps:
+1. Call `POST /scans/jobs` with `scan_type=quick`.
+2. Verify job appears in `GET /scans/jobs`.
+3. Run `POST /scans/jobs/{id}/run` (manager/admin).
+4. Read `GET /scans/jobs/{id}`.
+
+Expected:
+- Job transitions `queued -> running -> completed` (or `failed` with error details).
+- `attempts` is incremented.
+- `result_summary` is present for completed jobs.
+
+### AT-20: Frontend scan profile buttons
+Steps:
+1. Open `frontend/index.html`.
+2. Enter target IP.
+3. Click profile buttons: `Quick`, `Discovery`, `Vulnerability`, `Full`.
+
+Expected:
+- Buttons call scan-job API.
+- Job cards refresh automatically every few seconds.
+- Status changes are visible without page reload.

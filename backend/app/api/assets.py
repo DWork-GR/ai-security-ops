@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.api.rbac import require_roles
 from app.core.schemas import (
+    AssetDiscoveryListResponse,
+    AssetDiscoveryOut,
     AssetListResponse,
     AssetOut,
     AssetUpsertRequest,
@@ -12,6 +14,7 @@ from app.core.schemas import (
 from app.database.db import get_db
 from app.database.repository import (
     get_asset_by_ip,
+    get_latest_scan_run_for_target,
     list_assets,
     list_open_ports_for_scan_run,
     list_scan_runs,
@@ -56,6 +59,33 @@ def get_assets(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return AssetListResponse(items=[_serialize_asset(item) for item in items])
+
+
+@router.get("/discovered", response_model=AssetDiscoveryListResponse)
+def get_discovered_assets(
+    limit: int = Query(default=50, ge=1, le=200),
+    search: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+    _: str = Depends(require_roles("analyst", "manager", "admin")),
+):
+    items = list_assets(db, limit=limit, search=search)
+    payload: list[AssetDiscoveryOut] = []
+    for item in items:
+        latest = get_latest_scan_run_for_target(db, item.ip)
+        latest_ports = list_open_ports_for_scan_run(db, latest.id) if latest else []
+        payload.append(
+            AssetDiscoveryOut(
+                ip=item.ip,
+                hostname=item.hostname,
+                criticality=item.criticality,
+                environment=item.environment,
+                last_seen_at=item.last_seen_at,
+                latest_scan_at=latest.finished_at if latest else None,
+                latest_scan_profile=latest.scan_profile if latest else None,
+                latest_open_ports=latest_ports,
+            )
+        )
+    return AssetDiscoveryListResponse(items=payload)
 
 
 @router.put("", response_model=AssetOut)

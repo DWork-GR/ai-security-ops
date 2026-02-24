@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.api.rbac import require_roles
-from app.core.schemas import CVEListResponse, CVEOut, NvdImportRequest, NvdImportResponse
+from app.core.schemas import CVEListResponse, CVEOut, CVESeedResponse, NvdImportRequest, NvdImportResponse
 from app.database.db import get_db
-from app.database.repository import get_cve_by_id, search_cves
+from app.database.real_world_threats import REAL_WORLD_THREATS
+from app.database.repository import get_cve_by_id, search_cves, upsert_cves
 from app.services.error_service import record_exception
 from app.services.nvd_import_service import import_nvd_json
 
@@ -84,3 +85,29 @@ def import_knowledge_from_nvd(
         raise HTTPException(status_code=500, detail="NVD import failed") from exc
 
     return NvdImportResponse(**result)
+
+
+@router.post("/cves/seed/real-world", response_model=CVESeedResponse)
+def seed_real_world_threats(
+    db: Session = Depends(get_db),
+    _: str = Depends(require_roles("manager", "admin")),
+):
+    try:
+        created, updated = upsert_cves(db, REAL_WORLD_THREATS)
+    except Exception as exc:
+        record_exception(
+            db,
+            source="knowledge",
+            operation="seed_real_world",
+            exc=exc,
+            severity="HIGH",
+            context={"records": len(REAL_WORLD_THREATS)},
+        )
+        raise HTTPException(status_code=500, detail="Real-world threat seed failed") from exc
+
+    return CVESeedResponse(
+        imported_total=len(REAL_WORLD_THREATS),
+        created=created,
+        updated=updated,
+        source="real-world-curated-pack",
+    )

@@ -11,10 +11,13 @@ Core value: normalize and correlate security data from external tools
 - Exposes ingestion and query endpoints.
 - Handles auth, validation, and response contracts.
 - Enforces optional RBAC with analyst/manager/admin roles.
+- Exposes scan-job queue APIs for asynchronous execution tracking.
 
 2. Integration Adapters
 - `integrations/snort/*`: parse incoming or file-based Snort alerts.
 - `integrations/openvas/*`: create scan tasks and execute active TCP scan profile.
+- `integrations/nmap/*`: run network discovery scans (native nmap with socket fallback).
+- Outbound adapters: Telegram alerts, GitHub Issues ticketing, optional webhook.
 
 3. Domain Services
 - Incident creation and deduplication.
@@ -22,6 +25,9 @@ Core value: normalize and correlate security data from external tools
 - Correlation v2 using signature + asset inference + severity escalation.
 - Scan service maps open services to KB CVEs and creates incidents.
 - Error service fingerprints backend failures for operational troubleshooting.
+- Outbound service delivers incident events with retry and idempotency by channel/event key.
+- Scan job service executes scan profiles (`quick`, `discovery`, `vulnerability`, `full`).
+- Background worker polls queued jobs and runs scans outside request lifecycle.
 
 4. Persistence Layer (PostgreSQL via SQLAlchemy)
 - Stores CVEs, incidents, analysis results, and error events.
@@ -45,6 +51,10 @@ Current entities:
 - `AnalysisResult`
 - `IncidentAuditLog`
 - `ErrorEvent`
+- `ScanJob`
+- `ScanRun`
+- `ScanFinding`
+- `OutboundEvent`
 
 Target additions (next iterations):
 - `IntegrationEvent` (raw event envelope)
@@ -62,6 +72,11 @@ OpenVAS:
 - Start scan by target IP/CIDR.
 - Persist task metadata and result summary.
 - Convert vulnerabilities to incident candidates by severity threshold.
+
+Nmap:
+- Run active discovery by target IP and optional custom ports.
+- Return same structured response as OpenVAS active scan.
+- Persist scan baselines for new/closed open port diff.
 
 ### 6. Security Controls Baseline
 

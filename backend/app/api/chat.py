@@ -43,11 +43,17 @@ def _format_incident_rows(incidents) -> str:
     if not incidents:
         return "No incidents found."
 
-    lines = ["[Incidents] Latest SOC incidents:"]
+    lines = [
+        "[Incidents] Latest SOC incidents:",
+        "",
+        "| detected_at | severity | status | source | message |",
+        "| --- | --- | --- | --- | --- |",
+    ]
     for incident in incidents:
+        message = (incident.message or "").replace("|", "/").replace("\n", " ").strip()
         lines.append(
-            f"- {incident.detected_at.isoformat()} | {incident.severity} | "
-            f"{incident.status} | {incident.source} | {incident.message}"
+            f"| {incident.detected_at.isoformat()} | {incident.severity} | "
+            f"{incident.status} | {incident.source} | {message} |"
         )
     return "\n".join(lines)
 
@@ -115,11 +121,18 @@ def _format_active_scan_result(result: dict) -> str:
 def _format_error_rows(items) -> str:
     if not items:
         return "No error events found."
-    lines = ["[Errors] Latest error events:"]
+    lines = [
+        "[Errors] Latest error events:",
+        "",
+        "| last_seen_at | severity | operation | error_type | count |",
+        "| --- | --- | --- | --- | --- |",
+    ]
     for item in items:
+        operation = f"{item.source}.{item.operation}".replace("|", "/")
+        error_type = (item.error_type or "").replace("|", "/")
         lines.append(
-            f"- {item.last_seen_at.isoformat()} | {item.severity} | {item.source}.{item.operation} | "
-            f"{item.error_type} | count={item.occurrences}"
+            f"| {item.last_seen_at.isoformat()} | {item.severity} | {operation} | "
+            f"{error_type} | {item.occurrences} |"
         )
     return "\n".join(lines)
 

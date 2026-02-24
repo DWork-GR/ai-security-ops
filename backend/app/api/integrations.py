@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_integration_api_key
 from app.core.schemas import (
+    NmapActiveScanRequest,
+    NmapActiveScanResponse,
     OpenVASActiveScanRequest,
     OpenVASActiveScanResponse,
     OpenVASScanRequest,
@@ -87,6 +89,35 @@ def openvas_active_scan(payload: OpenVASActiveScanRequest, db: Session = Depends
         raise HTTPException(status_code=500, detail="Active scan execution failed") from exc
 
     return OpenVASActiveScanResponse(**result)
+
+
+@router.post("/nmap/scan/active", response_model=NmapActiveScanResponse)
+def nmap_active_scan(payload: NmapActiveScanRequest, db: Session = Depends(get_db)):
+    if not is_valid_ip(payload.target):
+        raise HTTPException(status_code=400, detail="Invalid target IP address")
+
+    try:
+        result = run_active_scan(
+            db,
+            target=payload.target,
+            ports=payload.ports,
+            timeout_ms=payload.timeout_ms,
+            source="nmap",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        record_exception(
+            db,
+            source="nmap",
+            operation="active_scan",
+            exc=exc,
+            severity="HIGH",
+            context={"target": payload.target},
+        )
+        raise HTTPException(status_code=500, detail="Nmap active scan execution failed") from exc
+
+    return NmapActiveScanResponse(**result)
 
 
 @router.post("/snort/alerts")

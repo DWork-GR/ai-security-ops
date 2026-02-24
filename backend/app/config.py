@@ -50,3 +50,19 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b").strip()
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "").strip()
 RBAC_KEYS = os.getenv("RBAC_KEYS", "").strip()
 RBAC_ENABLED = os.getenv("RBAC_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"} or bool(RBAC_KEYS)
+
+OUTBOUND_WEBHOOK_URL = os.getenv("OUTBOUND_WEBHOOK_URL", "").strip()
+OUTBOUND_WEBHOOK_TOKEN = os.getenv("OUTBOUND_WEBHOOK_TOKEN", "").strip()
+OUTBOUND_RETRY_MAX_ATTEMPTS = int(os.getenv("OUTBOUND_RETRY_MAX_ATTEMPTS", "3"))
+OUTBOUND_TIMEOUT_MS = int(os.getenv("OUTBOUND_TIMEOUT_MS", "4000"))
+OUTBOUND_MIN_SEVERITY = os.getenv("OUTBOUND_MIN_SEVERITY", "HIGH").strip().upper() or "HIGH"
+
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
+GITHUB_REPO = os.getenv("GITHUB_REPO", "").strip()
+GITHUB_ISSUE_LABELS = os.getenv("GITHUB_ISSUE_LABELS", "ai-security-ops,incident").strip()
+
+SCAN_WORKER_ENABLED = os.getenv("SCAN_WORKER_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+SCAN_WORKER_POLL_INTERVAL_SEC = float(os.getenv("SCAN_WORKER_POLL_INTERVAL_SEC", "1.5"))

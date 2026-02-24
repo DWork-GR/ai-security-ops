@@ -156,3 +156,36 @@ class ScanFinding(Base):
     fingerprint = Column(String(255), nullable=False)
 
     scan_run = relationship("ScanRun", back_populates="findings")
+
+
+class ScanJob(Base):
+    __tablename__ = "scan_jobs"
+
+    id = Column(String(36), primary_key=True, default=_uuid_str)
+    target_ip = Column(String(64), nullable=False)
+    scan_type = Column(String(32), nullable=False)
+    status = Column(String(20), nullable=False, default="queued")
+    requested_by = Column(String(120), nullable=True)
+    attempts = Column(Integer, nullable=False, default=0)
+    result_summary = Column(Text, nullable=True)
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=_utc_now_naive, nullable=False)
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)
+
+
+class OutboundEvent(Base):
+    __tablename__ = "outbound_events"
+
+    id = Column(String(36), primary_key=True, default=_uuid_str)
+    channel = Column(String(32), nullable=False)
+    event_type = Column(String(64), nullable=False)
+    fingerprint = Column(String(64), nullable=False, unique=True)
+    payload = Column(Text, nullable=False)
+    status = Column(String(20), nullable=False, default="pending")
+    attempts = Column(Integer, nullable=False, default=0)
+    last_error = Column(Text, nullable=True)
+    first_attempt_at = Column(DateTime, nullable=True)
+    last_attempt_at = Column(DateTime, nullable=True)
+    sent_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=_utc_now_naive, nullable=False)

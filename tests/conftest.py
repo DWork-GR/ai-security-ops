@@ -17,6 +17,7 @@ os.environ["GEMINI_API_KEY"] = ""
 os.environ["LLM_PROVIDER"] = "none"
 os.environ["RBAC_ENABLED"] = "false"
 os.environ["RBAC_KEYS"] = ""
+os.environ["SCAN_WORKER_ENABLED"] = "false"
 
 from app.database.db import Base, engine  # noqa: E402
 from app.database.seed_cves import seed as seed_cves  # noqa: E402

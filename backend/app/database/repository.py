@@ -9,6 +9,8 @@ from app.database.models import (
     ErrorEvent,
     Incident,
     IncidentAuditLog,
+    OutboundEvent,
+    ScanJob,
     ScanFinding,
     ScanRun,
 )
@@ -24,6 +26,9 @@ ALLOWED_STATUSES = {
 
 ALLOWED_SEVERITIES = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
 ALLOWED_ASSET_CRITICALITIES = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
+ALLOWED_OUTBOUND_STATUSES = {"pending", "sent", "failed", "skipped"}
+ALLOWED_SCAN_JOB_STATUSES = {"queued", "running", "completed", "failed", "cancelled"}
+ALLOWED_SCAN_JOB_TYPES = {"quick", "discovery", "vulnerability", "full"}
 
 
 def _utc_now_naive() -> datetime:
@@ -57,6 +62,36 @@ def _normalize_asset_criticality(value: str) -> str:
     raise ValueError(
         "Invalid asset criticality. Allowed: "
         + ", ".join(sorted(ALLOWED_ASSET_CRITICALITIES))
+    )
+
+
+def _normalize_outbound_status(value: str) -> str:
+    normalized = (value or "").lower().strip()
+    if normalized in ALLOWED_OUTBOUND_STATUSES:
+        return normalized
+    raise ValueError(
+        "Invalid outbound status. Allowed: "
+        + ", ".join(sorted(ALLOWED_OUTBOUND_STATUSES))
+    )
+
+
+def _normalize_scan_job_status(value: str) -> str:
+    normalized = (value or "").lower().strip()
+    if normalized in ALLOWED_SCAN_JOB_STATUSES:
+        return normalized
+    raise ValueError(
+        "Invalid scan job status. Allowed: "
+        + ", ".join(sorted(ALLOWED_SCAN_JOB_STATUSES))
+    )
+
+
+def _normalize_scan_job_type(value: str) -> str:
+    normalized = (value or "").lower().strip()
+    if normalized in ALLOWED_SCAN_JOB_TYPES:
+        return normalized
+    raise ValueError(
+        "Invalid scan type. Allowed: "
+        + ", ".join(sorted(ALLOWED_SCAN_JOB_TYPES))
     )
 
 
@@ -573,6 +608,113 @@ def list_open_ports_for_scan_run(db: Session, scan_run_id: str):
     return sorted({int(row[0]) for row in rows})
 
 
+def create_scan_job(
+    db: Session,
+    *,
+    target_ip: str,
+    scan_type: str,
+    requested_by: str | None = None,
+):
+    normalized_target = (target_ip or "").strip()
+    if not normalized_target:
+        raise ValueError("target_ip is required")
+
+    item = ScanJob(
+        target_ip=normalized_target,
+        scan_type=_normalize_scan_job_type(scan_type),
+        status="queued",
+        requested_by=(requested_by or "").strip() or None,
+        attempts=0,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def list_scan_jobs(
+    db: Session,
+    *,
+    limit: int = 100,
+    status: str | None = None,
+    scan_type: str | None = None,
+    target_ip: str | None = None,
+):
+    query = db.query(ScanJob)
+    if status:
+        query = query.filter(ScanJob.status == _normalize_scan_job_status(status))
+    if scan_type:
+        query = query.filter(ScanJob.scan_type == _normalize_scan_job_type(scan_type))
+    if target_ip:
+        query = query.filter(ScanJob.target_ip == target_ip.strip())
+
+    return query.order_by(ScanJob.created_at.desc()).limit(limit).all()
+
+
+def get_scan_job_by_id(db: Session, job_id: str):
+    return db.query(ScanJob).filter(ScanJob.id == job_id).first()
+
+
+def get_next_queued_scan_job(db: Session):
+    return (
+        db.query(ScanJob)
+        .filter(ScanJob.status == "queued")
+        .order_by(ScanJob.created_at.asc())
+        .first()
+    )
+
+
+def mark_scan_job_running(db: Session, item: ScanJob):
+    now = _utc_now_naive()
+    item.status = "running"
+    item.attempts = int(item.attempts or 0) + 1
+    if not item.started_at:
+        item.started_at = now
+    item.last_error = None
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def mark_scan_job_completed(
+    db: Session,
+    item: ScanJob,
+    *,
+    result_summary: str,
+):
+    item.status = "completed"
+    item.result_summary = result_summary
+    item.last_error = None
+    item.finished_at = _utc_now_naive()
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def mark_scan_job_failed(
+    db: Session,
+    item: ScanJob,
+    *,
+    error_message: str,
+):
+    item.status = "failed"
+    item.last_error = (error_message or "Unknown scan job error").strip()[:4000]
+    item.finished_at = _utc_now_naive()
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def cancel_scan_job(db: Session, item: ScanJob):
+    if item.status in {"completed", "failed", "cancelled"}:
+        return item
+    item.status = "cancelled"
+    item.finished_at = _utc_now_naive()
+    db.commit()
+    db.refresh(item)
+    return item
+
+
 def upsert_cves(
     db: Session,
     records: list[dict],
@@ -605,3 +747,128 @@ def upsert_cves(
 
     db.commit()
     return created, updated
+
+
+def get_outbound_event_by_fingerprint(db: Session, fingerprint: str):
+    return (
+        db.query(OutboundEvent)
+        .filter(OutboundEvent.fingerprint == fingerprint.strip())
+        .first()
+    )
+
+
+def create_outbound_event(
+    db: Session,
+    *,
+    channel: str,
+    event_type: str,
+    fingerprint: str,
+    payload: str,
+):
+    item = OutboundEvent(
+        channel=(channel or "").strip().lower(),
+        event_type=(event_type or "").strip().lower(),
+        fingerprint=fingerprint.strip(),
+        payload=payload,
+        status="pending",
+        attempts=0,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def mark_outbound_attempt_failed(
+    db: Session,
+    item: OutboundEvent,
+    *,
+    error_message: str,
+):
+    now = _utc_now_naive()
+    item.status = "failed"
+    item.attempts = int(item.attempts or 0) + 1
+    if not item.first_attempt_at:
+        item.first_attempt_at = now
+    item.last_attempt_at = now
+    item.last_error = (error_message or "Unknown delivery error").strip()[:2000]
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def mark_outbound_attempt_sent(db: Session, item: OutboundEvent):
+    now = _utc_now_naive()
+    item.status = "sent"
+    item.attempts = int(item.attempts or 0) + 1
+    if not item.first_attempt_at:
+        item.first_attempt_at = now
+    item.last_attempt_at = now
+    item.sent_at = now
+    item.last_error = None
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def mark_outbound_skipped(
+    db: Session,
+    item: OutboundEvent,
+    *,
+    reason: str,
+):
+    item.status = "skipped"
+    item.last_error = (reason or "Skipped").strip()[:2000]
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def list_outbound_events(
+    db: Session,
+    *,
+    limit: int = 100,
+    channel: str | None = None,
+    status: str | None = None,
+    event_type: str | None = None,
+):
+    query = db.query(OutboundEvent)
+    if channel:
+        query = query.filter(OutboundEvent.channel == channel.strip().lower())
+    if status:
+        query = query.filter(OutboundEvent.status == _normalize_outbound_status(status))
+    if event_type:
+        query = query.filter(OutboundEvent.event_type == event_type.strip().lower())
+
+    return query.order_by(OutboundEvent.created_at.desc()).limit(limit).all()
+
+
+def get_outbound_summary_stats(db: Session):
+    total_events = db.query(func.count(OutboundEvent.id)).scalar() or 0
+    status_rows = (
+        db.query(OutboundEvent.status, func.count(OutboundEvent.id))
+        .group_by(OutboundEvent.status)
+        .all()
+    )
+    channel_rows = (
+        db.query(OutboundEvent.channel, func.count(OutboundEvent.id))
+        .group_by(OutboundEvent.channel)
+        .all()
+    )
+    sent_total = (
+        db.query(func.count(OutboundEvent.id))
+        .filter(OutboundEvent.status == "sent")
+        .scalar()
+        or 0
+    )
+    success_rate = 0.0
+    if total_events:
+        success_rate = round((float(sent_total) / float(total_events)) * 100.0, 1)
+
+    return {
+        "total_events": int(total_events),
+        "sent_events": int(sent_total),
+        "success_rate_percent": success_rate,
+        "by_status": {row[0]: int(row[1]) for row in status_rows},
+        "by_channel": {row[0]: int(row[1]) for row in channel_rows},
+    }

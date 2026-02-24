@@ -5,6 +5,8 @@
 1. External signal appears:
 - Snort IDS alert
 - OpenVAS scan request/result
+- Nmap active discovery result
+- User queues scan job from UI buttons (`quick|discovery|vulnerability|full`)
 
 2. API receives payload:
 - Validates schema and source
@@ -28,6 +30,16 @@
 - UI and/or API consumer gets structured result
 - Incident state persisted for reporting
 
+8. Outbound actions:
+- For `HIGH/CRITICAL` incidents, send Telegram alert and create GitHub Issue.
+- Optional webhook receives same event envelope.
+- Delivery is tracked with retry counters and idempotency fingerprints.
+
+9. Async scan execution:
+- Scan job is stored with `queued` status.
+- Worker picks job, marks `running`, executes selected profile.
+- Job transitions to `completed` or `failed` with result summary and error trace.
+
 8. Governance:
 - Role-based access checks for incident/report endpoints.
 - Status transitions are written to audit log with actor role.
@@ -38,7 +50,7 @@
 ```json
 {
   "source": "snort|openvas",
-  "event_type": "ids_alert|vuln_scan_result",
+  "event_type": "ids_alert|vuln_scan_result|network_discovery_result",
   "title": "short event title",
   "severity": "LOW|MEDIUM|HIGH|CRITICAL",
   "priority": 1,

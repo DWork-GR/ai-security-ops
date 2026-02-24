@@ -30,14 +30,27 @@ For non-technical users, use chat as a single control panel:
 - `POST /integrations/snort/alerts` to ingest Snort alerts.
 - `POST /integrations/openvas/scan` to start OpenVAS scan task.
 - `POST /integrations/openvas/scan/active` to run active TCP scan with findings.
+- `POST /integrations/nmap/scan/active` to run network discovery scan with same structured output.
+- `POST /scans/jobs` to queue async scan jobs (`quick|discovery|vulnerability|full`).
+- `GET /scans/jobs` and `GET /scans/jobs/{id}` to track real-time scan status.
+- `POST /scans/jobs/{id}/run` to execute queued job immediately (manager/admin).
+- Outbound notifications for `HIGH/CRITICAL` incidents:
+  - Telegram alerts
+  - GitHub Issues ticketing (free-tier friendly)
+  - Optional generic webhook
 - `GET /incidents` to query incident list.
 - `GET /incidents/stats/summary` for SOC KPI snapshot.
 - `PATCH /incidents/{id}/status` for incident lifecycle workflow.
 - `GET /incidents/{id}/audit` for status/audit history.
 - `GET /knowledge/cves/search` for CVE filtering by query/severity/CVSS.
+- `POST /knowledge/cves/seed/real-world` to import curated high-impact real-world CVEs.
+- `GET /assets/discovered` to show discovered devices with latest scan/open ports snapshot.
 - `GET /errors` and `GET /errors/stats/summary` for operational error search.
+- `GET /outbound/events` and `GET /outbound/events/stats/summary` for delivery observability.
 - `GET /reports/operations` for bilingual operations report (EN/UK).
 - `GET /reports/operations/markdown` for export-ready Markdown report.
+- Unified active-scan model for OpenVAS/Nmap with baseline diff (`new_open_ports`, `closed_open_ports`).
+- Background scan worker for queued jobs (near real-time execution loop).
 - Incident correlation (24h dedup + severity escalation).
 - CVE knowledge base queries via chat.
 - Error event deduplication with fingerprints and occurrence counters.
@@ -65,6 +78,7 @@ For non-technical users, use chat as a single control panel:
 - Protect integration endpoints with `INTEGRATION_API_KEY` and `X-API-Key` header.
 - Optional RBAC for analyst/manager/admin using `X-User-Key` header.
 - Frontend rendering uses safe text output to avoid XSS.
+- Outbound integrations are idempotent per channel/event key and support retries.
 
 ## LLM Modes
 

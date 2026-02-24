@@ -88,6 +88,8 @@ Response:
 ```json
 {
   "task_id": "uuid",
+  "scanner": "openvas",
+  "discovery_engine": "nmap|socket-fallback",
   "target": "127.0.0.1",
   "status": "completed",
   "scan_profile": "tcp-custom",
@@ -108,13 +110,84 @@ Response:
     }
   ],
   "incidents_created": 1,
-  "incidents_updated": 0
+  "incidents_updated": 0,
+  "baseline_scan_task_id": "uuid|null",
+  "new_open_ports": [80],
+  "closed_open_ports": []
 }
 ```
 
-## 3) Incident Endpoints
+### `POST /integrations/nmap/scan/active`
+Request:
+```json
+{
+  "target": "127.0.0.1",
+  "ports": [22, 80, 443],
+  "timeout_ms": 120
+}
+```
 
-Headers for incident/report/knowledge/error endpoints when RBAC enabled:
+Response:
+```json
+{
+  "task_id": "uuid",
+  "scanner": "nmap",
+  "discovery_engine": "nmap|socket-fallback",
+  "target": "127.0.0.1",
+  "status": "completed",
+  "scan_profile": "nmap-tcp-custom",
+  "scanned_ports": 3,
+  "open_ports": [80],
+  "duration_ms": 64,
+  "findings": [],
+  "incidents_created": 1,
+  "incidents_updated": 0,
+  "baseline_scan_task_id": "uuid|null",
+  "new_open_ports": [80],
+  "closed_open_ports": []
+}
+```
+
+## 3) Scan Job Endpoints
+
+### `POST /scans/jobs`
+Request:
+```json
+{
+  "target_ip": "127.0.0.1",
+  "scan_type": "quick"
+}
+```
+
+Response:
+```json
+{
+  "id": "uuid",
+  "target_ip": "127.0.0.1",
+  "scan_type": "quick",
+  "status": "queued",
+  "attempts": 0,
+  "result_summary": null,
+  "last_error": null,
+  "created_at": "2026-02-24T12:00:00Z",
+  "started_at": null,
+  "finished_at": null
+}
+```
+
+### `GET /scans/jobs`
+Filters:
+- `limit`, `status`, `scan_type`, `target_ip`
+
+### `GET /scans/jobs/{job_id}`
+Returns one scan job.
+
+### `POST /scans/jobs/{job_id}/run`
+Manager/admin endpoint. Forces immediate execution for queued/failed job.
+
+## 4) Incident Endpoints
+
+Headers for incident/report/knowledge/error/outbound endpoints when RBAC enabled:
 - `X-User-Key: <analyst|manager|admin key>`
 
 ### `GET /incidents`
@@ -135,7 +208,7 @@ Response includes status transitions and actor role.
 ### `GET /incidents/stats/summary`
 Returns operational KPI counters by status/severity/source.
 
-## 4) Knowledge Base Endpoints
+## 5) Knowledge Base Endpoints
 
 ### `GET /knowledge/cves/search`
 Filters:
@@ -160,7 +233,47 @@ Response:
 ### `GET /knowledge/cves/{cve_id}`
 Returns one CVE record.
 
-## 5) Error Intelligence Endpoints
+### `POST /knowledge/cves/seed/real-world`
+Manager/admin endpoint to import curated real-world CVEs.
+
+Response:
+```json
+{
+  "imported_total": 46,
+  "created": 26,
+  "updated": 20,
+  "source": "real-world-curated-pack"
+}
+```
+
+## 6) Asset Inventory Endpoints
+
+### `GET /assets`
+Filters:
+- `limit`, `criticality`, `environment`, `search`
+
+### `GET /assets/discovered`
+Returns discovered device inventory view (last seen + latest scan/open ports).
+
+Response:
+```json
+{
+  "items": [
+    {
+      "ip": "127.0.0.1",
+      "hostname": null,
+      "criticality": "MEDIUM",
+      "environment": "unknown",
+      "last_seen_at": "2026-02-24T12:00:00Z",
+      "latest_scan_at": "2026-02-24T12:00:10Z",
+      "latest_scan_profile": "nmap-tcp-default",
+      "latest_open_ports": [22, 5432]
+    }
+  ]
+}
+```
+
+## 7) Error Intelligence Endpoints
 
 ### `GET /errors`
 Filters:
@@ -190,7 +303,39 @@ Response:
 ### `GET /errors/stats/summary`
 Manager/admin endpoint with total errors, total occurrences, last-24h counters, and groupings.
 
-## 6) Report Endpoints
+## 8) Outbound Delivery Endpoints
+
+### `GET /outbound/events`
+Manager/admin endpoint.
+
+Filters:
+- `limit`, `channel`, `status`, `event_type`
+
+Response:
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "channel": "telegram",
+      "event_type": "incident.created",
+      "fingerprint": "sha256...",
+      "status": "sent",
+      "attempts": 2,
+      "last_error": null,
+      "first_attempt_at": "2026-02-24T12:00:00Z",
+      "last_attempt_at": "2026-02-24T12:00:01Z",
+      "sent_at": "2026-02-24T12:00:01Z",
+      "created_at": "2026-02-24T12:00:00Z"
+    }
+  ]
+}
+```
+
+### `GET /outbound/events/stats/summary`
+Manager/admin endpoint with delivery KPIs.
+
+## 9) Report Endpoints
 
 ### `GET /reports/operations`
 Returns bilingual EN/UK operations summary with incident and error metrics.

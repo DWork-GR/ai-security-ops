@@ -225,10 +225,97 @@ def test_openvas_active_scan_returns_structured_findings(client):
     payload = response.json()
     assert payload["target"] == "127.0.0.1"
     assert payload["status"] == "completed"
+    assert payload["scanner"] == "openvas"
+    assert payload["discovery_engine"] in {"nmap", "socket-fallback"}
     assert payload["scan_profile"] in {"tcp-default", "tcp-custom"}
     assert payload["scanned_ports"] == 3
     assert "incidents_created" in payload
     assert "incidents_updated" in payload
+
+
+def test_nmap_active_scan_returns_structured_findings(client):
+    response = client.post(
+        "/integrations/nmap/scan/active",
+        json={"target": "127.0.0.1", "ports": [22, 80, 443], "timeout_ms": 120},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["target"] == "127.0.0.1"
+    assert payload["status"] == "completed"
+    assert payload["scanner"] == "nmap"
+    assert payload["discovery_engine"] in {"nmap", "socket-fallback"}
+    assert payload["scan_profile"] in {"nmap-tcp-default", "nmap-tcp-custom"}
+    assert payload["scanned_ports"] == 3
+    assert "incidents_created" in payload
+    assert "incidents_updated" in payload
+
+    incidents_response = client.get("/incidents")
+    assert incidents_response.status_code == 200
+    items = incidents_response.json()["items"]
+    assert any(item["source"] == "nmap" for item in items)
+
+
+def test_scan_jobs_create_and_list(client):
+    created = client.post(
+        "/scans/jobs",
+        json={"target_ip": "127.0.0.1", "scan_type": "quick"},
+    )
+    assert created.status_code == 200
+    payload = created.json()
+    assert payload["target_ip"] == "127.0.0.1"
+    assert payload["scan_type"] == "quick"
+    assert payload["status"] == "queued"
+    assert payload["id"]
+
+    listed = client.get("/scans/jobs", params={"status": "queued", "limit": 20})
+    assert listed.status_code == 200
+    items = listed.json()["items"]
+    assert any(item["id"] == payload["id"] for item in items)
+
+    loaded = client.get(f"/scans/jobs/{payload['id']}")
+    assert loaded.status_code == 200
+    assert loaded.json()["id"] == payload["id"]
+
+
+def test_scan_job_run_now_executes_and_returns_summary(client, monkeypatch):
+    from app.services import scan_job_service
+
+    def fake_run_active_scan(db, *, target, ports=None, timeout_ms=250, source="openvas"):
+        return {
+            "task_id": "job-test-task",
+            "scanner": source,
+            "discovery_engine": "socket-fallback",
+            "target": target,
+            "status": "completed",
+            "scan_profile": "nmap-tcp-custom" if source == "nmap" else "tcp-custom",
+            "scanned_ports": len(ports or []),
+            "open_ports": [80],
+            "duration_ms": 11,
+            "findings": [],
+            "incidents_created": 1,
+            "incidents_updated": 0,
+            "baseline_scan_task_id": None,
+            "new_open_ports": [80],
+            "closed_open_ports": [],
+        }
+
+    monkeypatch.setattr(scan_job_service, "run_active_scan", fake_run_active_scan)
+
+    created = client.post(
+        "/scans/jobs",
+        json={"target_ip": "127.0.0.1", "scan_type": "quick"},
+    )
+    assert created.status_code == 200
+    job_id = created.json()["id"]
+
+    executed = client.post(f"/scans/jobs/{job_id}/run")
+    assert executed.status_code == 200
+    payload = executed.json()
+    assert payload["id"] == job_id
+    assert payload["status"] == "completed"
+    assert payload["attempts"] == 1
+    assert payload["result_summary"]["scanner"] == "nmap"
+    assert payload["result_summary"]["open_ports"] == [80]
 
 
 def test_knowledge_search_filters_by_cvss_and_query(client):
@@ -264,6 +351,109 @@ def test_error_event_is_recorded_and_searchable(client, monkeypatch):
     stats = client.get("/errors/stats/summary")
     assert stats.status_code == 200
     assert stats.json()["total_errors"] >= 1
+
+
+def test_outbound_delivery_retry_for_telegram_and_github(client, monkeypatch):
+    from app import config
+    from app.services import outbound_service
+
+    monkeypatch.setattr(config, "OUTBOUND_MIN_SEVERITY", "HIGH")
+    monkeypatch.setattr(config, "OUTBOUND_RETRY_MAX_ATTEMPTS", 2)
+    monkeypatch.setattr(config, "TELEGRAM_BOT_TOKEN", "demo-token")
+    monkeypatch.setattr(config, "TELEGRAM_CHAT_ID", "123456")
+    monkeypatch.setattr(config, "GITHUB_TOKEN", "ghp_demo")
+    monkeypatch.setattr(config, "GITHUB_REPO", "owner/repo")
+    monkeypatch.setattr(config, "OUTBOUND_WEBHOOK_URL", "")
+
+    attempts: dict[tuple[str, str], int] = {}
+
+    def flaky_delivery(*, channel: str, payload: dict, idempotency_key: str):
+        key = (channel, idempotency_key)
+        attempts[key] = attempts.get(key, 0) + 1
+        if attempts[key] == 1:
+            raise RuntimeError(f"temporary {channel} failure")
+
+    monkeypatch.setattr(outbound_service, "_deliver_to_channel", flaky_delivery)
+
+    response = client.post(
+        "/integrations/snort/alerts",
+        json={
+            "alerts": [
+                {
+                    "message": "[**] SQL Injection Attempt [**]",
+                    "priority": 1,
+                    "src_ip": "192.168.1.20",
+                    "dst_ip": "10.0.0.20",
+                }
+            ]
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["incidents_created"] == 1
+
+    outbound_items = client.get("/outbound/events")
+    assert outbound_items.status_code == 200
+    items = outbound_items.json()["items"]
+    assert len(items) == 2
+    assert {item["channel"] for item in items} == {"telegram", "github"}
+    assert all(item["status"] == "sent" for item in items)
+    assert all(item["attempts"] == 2 for item in items)
+
+    stats = client.get("/outbound/events/stats/summary")
+    assert stats.status_code == 200
+    payload = stats.json()
+    assert payload["total_events"] == 2
+    assert payload["sent_events"] == 2
+
+
+def test_outbound_idempotency_uses_channel_and_event_key(monkeypatch):
+    from app import config
+    from app.database.db import SessionLocal
+    from app.database.repository import create_incident, list_outbound_events
+    from app.services import outbound_service
+
+    monkeypatch.setattr(config, "OUTBOUND_MIN_SEVERITY", "HIGH")
+    monkeypatch.setattr(config, "OUTBOUND_RETRY_MAX_ATTEMPTS", 2)
+    monkeypatch.setattr(config, "TELEGRAM_BOT_TOKEN", "demo-token")
+    monkeypatch.setattr(config, "TELEGRAM_CHAT_ID", "123456")
+    monkeypatch.setattr(config, "GITHUB_TOKEN", "")
+    monkeypatch.setattr(config, "GITHUB_REPO", "")
+    monkeypatch.setattr(config, "OUTBOUND_WEBHOOK_URL", "")
+
+    calls = {"count": 0}
+
+    def ok_delivery(*, channel: str, payload: dict, idempotency_key: str):
+        calls["count"] += 1
+
+    monkeypatch.setattr(outbound_service, "_deliver_to_channel", ok_delivery)
+
+    with SessionLocal() as db:
+        incident = create_incident(
+            db,
+            source="snort",
+            message="Critical alert for 10.0.0.9",
+            severity="CRITICAL",
+            status="new",
+        )
+        outbound_service.dispatch_incident_event(
+            db,
+            incident=incident,
+            event_type="incident.created",
+            event_key="evt-fixed",
+        )
+        outbound_service.dispatch_incident_event(
+            db,
+            incident=incident,
+            event_type="incident.created",
+            event_key="evt-fixed",
+        )
+        items = list_outbound_events(db, limit=50)
+
+    assert calls["count"] == 1
+    assert len(items) == 1
+    assert items[0].channel == "telegram"
+    assert items[0].status == "sent"
+    assert items[0].attempts == 1
 
 
 def test_chat_help_menu_is_available(client):
@@ -330,3 +520,47 @@ def test_chat_platform_status_and_roadmap(client):
     roadmap_payload = roadmap.json()
     assert roadmap_payload["type"] == "text"
     assert "[План Розвитку Диплому]" in roadmap_payload["message"]
+def test_knowledge_seed_real_world_pack_is_available(client):
+    first = client.post("/knowledge/cves/seed/real-world")
+    assert first.status_code == 200
+    payload = first.json()
+    assert payload["source"] == "real-world-curated-pack"
+    assert payload["imported_total"] >= 40
+    assert payload["created"] + payload["updated"] == payload["imported_total"]
+
+    second = client.post("/knowledge/cves/seed/real-world")
+    assert second.status_code == 200
+    second_payload = second.json()
+    assert second_payload["created"] == 0
+    assert second_payload["updated"] == second_payload["imported_total"]
+
+
+def test_assets_discovered_returns_latest_open_ports(client, monkeypatch):
+    from app.services import scan_service
+
+    def fake_discover_open_tcp_ports(*, target, ports, timeout_ms):
+        return [22, 5432], "socket-fallback"
+
+    monkeypatch.setattr(scan_service, "discover_open_tcp_ports", fake_discover_open_tcp_ports)
+
+    scan = client.post("/integrations/openvas/scan/active", json={"target": "127.0.0.1"})
+    assert scan.status_code == 200
+
+    discovered = client.get("/assets/discovered", params={"limit": 10})
+    assert discovered.status_code == 200
+    items = discovered.json()["items"]
+    assert len(items) >= 1
+
+    host = next((item for item in items if item["ip"] == "127.0.0.1"), None)
+    assert host is not None
+    assert host["latest_open_ports"] == [22, 5432]
+    assert host["latest_scan_profile"]
+
+
+def test_chat_show_incidents_returns_markdown_table(client):
+    client.post("/integrations/openvas/scan", json={"target": "10.0.0.5"})
+    response = client.post("/chat", json={"message": "show incidents"})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["type"] == "text"
+    assert "| detected_at | severity | status | source | message |" in payload["message"]

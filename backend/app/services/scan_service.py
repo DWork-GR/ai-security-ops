@@ -1,4 +1,3 @@
-import socket
 import time
 import uuid
 from datetime import datetime, timezone
@@ -13,6 +12,7 @@ from app.database.repository import (
     upsert_asset,
     get_latest_scan_run_for_target,
 )
+from app.integrations.nmap.scanner import discover_open_tcp_ports
 from app.services.incident_service import calculate_risk_score, correlate_incident
 
 DEFAULT_TCP_PORTS = [
@@ -111,18 +111,6 @@ def _resolve_severity(cves) -> str:
     return top
 
 
-def _scan_tcp_port(target: str, port: int, timeout_sec: float) -> bool:
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        sock.settimeout(timeout_sec)
-        result = sock.connect_ex((target, port))
-        return result == 0
-    except OSError:
-        return False
-    finally:
-        sock.close()
-
-
 def _match_cves_for_service(db: Session, service: str, limit: int = 3):
     hints = SERVICE_HINTS.get(service, [service])
     matched = []
@@ -151,12 +139,13 @@ def run_active_scan(
     target: str,
     ports: list[int] | None = None,
     timeout_ms: int = 250,
+    source: str = "openvas",
 ):
     if timeout_ms < 50 or timeout_ms > 3000:
         raise ValueError("timeout_ms must be between 50 and 3000")
 
     scan_ports = _normalize_ports(ports)
-    timeout_sec = timeout_ms / 1000.0
+    normalized_source = (source or "openvas").lower().strip() or "openvas"
     task_id = str(uuid.uuid4())
     started_at = _utc_now_naive()
 
@@ -166,7 +155,11 @@ def run_active_scan(
     )
 
     started_perf = time.perf_counter()
-    open_ports = [port for port in scan_ports if _scan_tcp_port(target, port, timeout_sec)]
+    open_ports, discovery_engine = discover_open_tcp_ports(
+        target=target,
+        ports=scan_ports,
+        timeout_ms=timeout_ms,
+    )
     duration_ms = int((time.perf_counter() - started_perf) * 1000)
     finished_at = _utc_now_naive()
 
@@ -175,11 +168,15 @@ def run_active_scan(
 
     asset = upsert_asset(db, ip=target)
 
+    profile_prefix = "tcp"
+    if normalized_source != "openvas":
+        profile_prefix = f"{normalized_source}-tcp"
+
     scan_run = create_scan_run(
         db,
         task_id=task_id,
         target_ip=target,
-        scan_profile="tcp-default" if not ports else "tcp-custom",
+        scan_profile=f"{profile_prefix}-default" if not ports else f"{profile_prefix}-custom",
         status="completed",
         scanned_ports=len(scan_ports),
         open_ports_count=len(open_ports),
@@ -198,7 +195,7 @@ def run_active_scan(
         cve_refs = [item.cve_id for item in cves]
         severity = _resolve_severity(cves)
         max_cvss = max((item.cvss for item in cves), default=0.0)
-        base_risk = calculate_risk_score(severity=severity, source="openvas", status="new")
+        base_risk = calculate_risk_score(severity=severity, source=normalized_source, status="new")
         risk = _apply_asset_criticality_bonus(base_risk, asset.criticality)
 
         finding = {
@@ -230,12 +227,12 @@ def run_active_scan(
         )
 
         incident_message = (
-            f"Active scan finding on {target}:{port}/tcp ({service}) "
+            f"{normalized_source.upper()} active scan finding on {target}:{port}/tcp ({service}) "
             f"severity={severity}; cves={','.join(cve_refs) if cve_refs else 'n/a'}"
         )
         _, created = correlate_incident(
             db,
-            source="openvas",
+            source=normalized_source,
             message=incident_message,
             severity=severity,
             asset=target,
@@ -250,8 +247,11 @@ def run_active_scan(
     if not findings:
         _, created = correlate_incident(
             db,
-            source="openvas",
-            message=f"Active scan completed for {target}: no open ports from selected profile.",
+            source=normalized_source,
+            message=(
+                f"{normalized_source.upper()} active scan completed for {target}: "
+                "no open ports from selected profile."
+            ),
             severity="LOW",
             asset=target,
             signature=f"{target}:no_open_ports",
@@ -264,6 +264,8 @@ def run_active_scan(
 
     return {
         "task_id": task_id,
+        "scanner": normalized_source,
+        "discovery_engine": discovery_engine,
         "target": target,
         "status": "completed",
         "scan_profile": scan_run.scan_profile,

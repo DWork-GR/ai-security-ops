@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>AI SOC Console</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Security Ops Console</title>
 
   <link rel="stylesheet" href="styles/base.css">
   <link rel="stylesheet" href="styles/layout.css">
@@ -10,37 +11,108 @@
   <link rel="stylesheet" href="styles/input.css">
 </head>
 <body>
-
   <div class="app-bg">
-    <div class="soc-console">
+    <div class="app-shell">
+      <aside class="ops-panel">
+        <header class="ops-header">
+          <div>
+            <h1 class="title">AI Security Ops</h1>
+            <p class="subtitle">Control Center</p>
+          </div>
+          <span class="status">Connected</span>
+        </header>
 
-      <header class="header">
-        <span class="title">AI SOC Console</span>
-        <span class="status">Connected</span>
-      </header>
+        <div class="ops-scroll">
+          <section class="panel-card">
+            <div class="section-head">
+              <h2>Quick Commands</h2>
+              <span>One click chat actions</span>
+            </div>
+            <div class="quick-actions" id="quick-actions">
+              <button type="button" class="quick-action" data-prompt="help">Help</button>
+              <button type="button" class="quick-action" data-prompt="full check 127.0.0.1">Full Check</button>
+              <button type="button" class="quick-action" data-prompt="show critical cves">Critical CVE</button>
+              <button type="button" class="quick-action" data-prompt="show incidents">Incidents</button>
+              <button type="button" class="quick-action" data-prompt="incident stats">SOC Stats</button>
+              <button type="button" class="quick-action" data-prompt="show errors">Errors</button>
+              <button type="button" class="quick-action" data-prompt="analyze threats">Threat Analysis</button>
+              <button type="button" class="quick-action" data-prompt="system status">System Status</button>
+              <button type="button" class="quick-action" data-prompt="roadmap">Roadmap</button>
+            </div>
+          </section>
 
-      <section class="quick-actions" id="quick-actions">
-        <button type="button" class="quick-action" data-prompt="допомога">Допомога</button>
-        <button type="button" class="quick-action" data-prompt="повна перевірка 127.0.0.1">Повна Перевірка</button>
-        <button type="button" class="quick-action" data-prompt="покажи критичні cve">Критичні CVE</button>
-        <button type="button" class="quick-action" data-prompt="покажи інциденти">Інциденти</button>
-        <button type="button" class="quick-action" data-prompt="статистика інцидентів">Статистика SOC</button>
-        <button type="button" class="quick-action" data-prompt="покажи помилки">Помилки</button>
-        <button type="button" class="quick-action" data-prompt="аналіз загроз">Аналіз Загроз</button>
-        <button type="button" class="quick-action" data-prompt="статус системи">Статус Системи</button>
-        <button type="button" class="quick-action" data-prompt="план розвитку">План Розвитку</button>
-      </section>
+          <section class="panel-card">
+            <div class="section-head">
+              <h2>Threat Intelligence</h2>
+              <span>Curated real CVEs</span>
+            </div>
+            <button type="button" class="scan-action wide-action" id="seed-threat-pack">
+              Load Real Threat Pack
+            </button>
+          </section>
 
-      <main class="messages" id="messages"></main>
+          <section class="panel-card scan-panel">
+            <div class="section-head">
+              <h2>Scan Center</h2>
+              <span>Queue and monitor scans</span>
+            </div>
 
-      <form class="input-area" id="chat-form">
-        <input id="input" placeholder="Приклад: допомога, повна перевірка 127.0.0.1, пошук cve apache" />
-        <button type="submit" id="send-btn">Send</button>
-      </form>
+            <label class="field-label" for="scan-target">Target IP</label>
+            <div class="scan-target-row">
+              <input id="scan-target" value="127.0.0.1" placeholder="example: 10.0.0.5" />
+            </div>
+
+            <label class="field-label" for="user-key">RBAC User Key</label>
+            <div class="auth-row">
+              <input id="user-key" placeholder="analyst-key / manager-key / admin-key" />
+            </div>
+
+            <div class="scan-controls" id="scan-controls">
+              <button type="button" class="scan-action" data-scan-type="quick">Quick</button>
+              <button type="button" class="scan-action" data-scan-type="discovery">Discovery</button>
+              <button type="button" class="scan-action" data-scan-type="vulnerability">Vulnerability</button>
+              <button type="button" class="scan-action" data-scan-type="full">Full</button>
+            </div>
+
+            <div class="scan-jobs-head">
+              <strong>Live Queue</strong>
+              <small>Refresh every 3s</small>
+            </div>
+            <div class="scan-jobs" id="scan-jobs"></div>
+          </section>
+
+          <section class="panel-card">
+            <div class="section-head">
+              <h2>Discovered Devices</h2>
+              <span>Inventory from real scans</span>
+            </div>
+            <div class="scan-jobs-head">
+              <strong>Network Asset View</strong>
+              <small>Refresh every 5s</small>
+            </div>
+            <div class="asset-list" id="discovered-assets"></div>
+          </section>
+        </div>
+      </aside>
+
+      <main class="chat-panel">
+        <header class="chat-header">
+          <div>
+            <h2>Analyst Chat</h2>
+            <p>Conversation and investigation output</p>
+          </div>
+        </header>
+
+        <section class="messages" id="messages"></section>
+
+        <form class="input-area" id="chat-form">
+          <input id="input" placeholder="Example: show incidents, search cve apache, analyze threats" />
+          <button type="submit" id="send-btn">Send</button>
+        </form>
+      </main>
     </div>
   </div>
 
   <script type="module" src="js/chat.js"></script>
-
 </body>
 </html>

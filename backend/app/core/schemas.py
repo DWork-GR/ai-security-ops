@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -31,7 +31,7 @@ class OpenVASActiveScanRequest(BaseModel):
     timeout_ms: int = Field(default=250, ge=50, le=3000)
 
 
-class OpenVASFindingOut(BaseModel):
+class ActiveScanFindingOut(BaseModel):
     port: int
     protocol: str
     service: str
@@ -43,20 +43,40 @@ class OpenVASFindingOut(BaseModel):
     summary_uk: str
 
 
-class OpenVASActiveScanResponse(BaseModel):
+class ActiveScanResponse(BaseModel):
     task_id: str
+    scanner: str
+    discovery_engine: str
     target: str
     status: str
     scan_profile: str
     scanned_ports: int
     open_ports: List[int]
     duration_ms: int
-    findings: List[OpenVASFindingOut]
+    findings: List[ActiveScanFindingOut]
     incidents_created: int
     incidents_updated: int
     baseline_scan_task_id: Optional[str] = None
     new_open_ports: List[int] = Field(default_factory=list)
     closed_open_ports: List[int] = Field(default_factory=list)
+
+
+class OpenVASFindingOut(ActiveScanFindingOut):
+    pass
+
+
+class OpenVASActiveScanResponse(ActiveScanResponse):
+    pass
+
+
+class NmapActiveScanRequest(BaseModel):
+    target: str
+    ports: Optional[List[int]] = None
+    timeout_ms: int = Field(default=250, ge=50, le=3000)
+
+
+class NmapActiveScanResponse(ActiveScanResponse):
+    pass
 
 
 class SnortAlertIn(BaseModel):
@@ -138,6 +158,13 @@ class CVEListResponse(BaseModel):
     items: List[CVEOut]
 
 
+class CVESeedResponse(BaseModel):
+    imported_total: int
+    created: int
+    updated: int
+    source: str
+
+
 class ErrorEventOut(BaseModel):
     id: str
     source: str
@@ -163,6 +190,32 @@ class ErrorSummaryStatsResponse(BaseModel):
     by_severity: Dict[str, int]
     by_source: Dict[str, int]
     by_type: Dict[str, int]
+
+
+class OutboundEventOut(BaseModel):
+    id: str
+    channel: str
+    event_type: str
+    fingerprint: str
+    status: str
+    attempts: int
+    last_error: Optional[str] = None
+    first_attempt_at: Optional[datetime] = None
+    last_attempt_at: Optional[datetime] = None
+    sent_at: Optional[datetime] = None
+    created_at: datetime
+
+
+class OutboundEventListResponse(BaseModel):
+    items: List[OutboundEventOut]
+
+
+class OutboundSummaryStatsResponse(BaseModel):
+    total_events: int
+    sent_events: int
+    success_rate_percent: float
+    by_status: Dict[str, int]
+    by_channel: Dict[str, int]
 
 
 class AssetUpsertRequest(BaseModel):
@@ -192,6 +245,21 @@ class AssetListResponse(BaseModel):
     items: List[AssetOut]
 
 
+class AssetDiscoveryOut(BaseModel):
+    ip: str
+    hostname: Optional[str] = None
+    criticality: str
+    environment: str
+    last_seen_at: datetime
+    latest_scan_at: Optional[datetime] = None
+    latest_scan_profile: Optional[str] = None
+    latest_open_ports: List[int] = Field(default_factory=list)
+
+
+class AssetDiscoveryListResponse(BaseModel):
+    items: List[AssetDiscoveryOut]
+
+
 class ScanRunOut(BaseModel):
     task_id: str
     target_ip: str
@@ -207,6 +275,33 @@ class ScanRunOut(BaseModel):
 
 class ScanRunListResponse(BaseModel):
     items: List[ScanRunOut]
+
+
+class ScanJobCreateRequest(BaseModel):
+    target_ip: str
+    scan_type: str = Field(
+        default="quick",
+        description="quick|discovery|vulnerability|full",
+    )
+    requested_by: Optional[str] = None
+
+
+class ScanJobOut(BaseModel):
+    id: str
+    target_ip: str
+    scan_type: str
+    status: str
+    requested_by: Optional[str] = None
+    attempts: int
+    result_summary: Optional[Dict[str, Any]] = None
+    last_error: Optional[str] = None
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    finished_at: Optional[datetime] = None
+
+
+class ScanJobListResponse(BaseModel):
+    items: List[ScanJobOut]
 
 
 class NvdImportRequest(BaseModel):
