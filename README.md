@@ -1,111 +1,207 @@
-# AI Security Ops (Integration-First MVP)
+﻿# AI Security Ops
 
-Integration-centric bachelor diploma project in cybersecurity.
-The main value is SOC tooling integration (Snort/OpenVAS), not chat UX.
+Integration-first SOC assistant for a cybersecurity bachelor diploma project.
 
-## Core Idea
-
-The system ingests security signals, normalizes events, creates incidents,
-and returns actionable recommendations.
-
-Pipeline:
+The project focuses on security operations workflows:
 `Ingest -> Normalize -> Correlate -> Prioritize -> Recommend -> Track`
 
-## User-Friendly Chat Mode
+## What This Project Does
 
-For non-technical users, use chat as a single control panel:
-- `допомога`
-- `повна перевірка <ip>`
-- `скан <ip>`
-- `покажи інциденти`
-- `статистика інцидентів`
-- `покажи критичні cve`
-- `пошук cve <ключове_слово>`
-- `покажи помилки`
-- `статистика помилок`
+- Accepts events from integrations (Snort, OpenVAS/Nmap style scans).
+- Correlates findings into incidents with ATT&CK enrichment.
+- Tracks scan jobs, assets, errors, and outbound notification delivery.
+- Provides analyst chat commands for quick SOC actions.
+- Generates operational summaries for reports and demos.
 
-## Current Features
+## Architecture
 
-- `POST /chat` for analyst quick commands.
-- `POST /integrations/snort/alerts` to ingest Snort alerts.
-- `POST /integrations/openvas/scan` to start OpenVAS scan task.
-- `POST /integrations/openvas/scan/active` to run active TCP scan with findings.
-- `POST /integrations/nmap/scan/active` to run network discovery scan with same structured output.
-- `POST /scans/jobs` to queue async scan jobs (`quick|discovery|vulnerability|full`).
-- `GET /scans/jobs` and `GET /scans/jobs/{id}` to track real-time scan status.
-- `POST /scans/jobs/{id}/run` to execute queued job immediately (manager/admin).
-- Outbound notifications for `HIGH/CRITICAL` incidents:
-  - Telegram alerts
-  - GitHub Issues ticketing (free-tier friendly)
-  - Optional generic webhook
-- `GET /incidents` to query incident list.
-- ATT&CK enrichment for incidents (auto tactic/technique inference).
-- `GET /incidents/stats/summary` for SOC KPI snapshot.
-- `PATCH /incidents/{id}/status` for incident lifecycle workflow.
-- `GET /incidents/{id}/audit` for status/audit history.
-- `GET /knowledge/cves/search` for CVE filtering by query/severity/CVSS.
-- `POST /knowledge/cves/seed/real-world` to import curated high-impact real-world CVEs.
-- `GET /assets/discovered` to show discovered devices with latest scan/open ports snapshot.
-- `GET /stream/soc-live` for real-time SSE snapshots (incidents/errors/scan jobs/assets).
-- `GET /errors` and `GET /errors/stats/summary` for operational error search.
-- `GET /outbound/events` and `GET /outbound/events/stats/summary` for delivery observability.
-- `GET /reports/operations` for bilingual operations report (EN/UK).
-- `GET /reports/operations/markdown` for export-ready Markdown report.
-- Unified active-scan model for OpenVAS/Nmap with baseline diff (`new_open_ports`, `closed_open_ports`).
-- Background scan worker for queued jobs (near real-time execution loop).
-- Incident correlation (24h dedup + severity escalation).
-- CVE knowledge base queries via chat.
-- Error event deduplication with fingerprints and occurrence counters.
+Backend:
+- `FastAPI` + `SQLAlchemy` + SQLite/PostgreSQL compatible config
+- Modular API routers (`integrations`, `incidents`, `scans`, `assets`, `knowledge`, `errors`, `outbound`, `reports`, `stream`, `chat`)
 
-## Setup
+Frontend:
+- Static HTML/CSS/JS SOC console
+- Chat workspace + queue status + discovered assets + live feed
 
-1. Create and activate a virtual environment.
-2. Install backend dependencies:
-   - `pip install -r backend/requirements.txt`
-3. Copy env template and set real secrets:
-   - `.env.example -> .env`
-   - Generate strong random values for `INTEGRATION_API_KEY` and `RBAC_KEYS`.
-   - For no external AI usage set `LLM_PROVIDER=none`.
-   - For free local AI set `LLM_PROVIDER=ollama` and run Ollama locally.
-4. Run API:
-   - `uvicorn app.main:app --reload --app-dir backend`
-5. Open frontend:
-   - `frontend/index.html` using local static server.
-6. Run tests:
-   - `python -m pytest -q`
+Core security model:
+- Integration auth via `X-API-Key`
+- RBAC via `X-User-Key` (`analyst`, `manager`, `admin`)
+- Sensitive values redacted in error pipeline
 
-## Security Notes
+## Repository Layout
+
+```text
+backend/
+  app/
+    api/
+    services/
+    integrations/
+    database/
+frontend/
+tests/
+docs/
+```
+
+## Quick Start
+
+1. Create and activate virtual environment.
+2. Install dependencies:
+```bash
+pip install -r backend/requirements.txt
+```
+3. Create local config:
+```bash
+copy .env.example .env
+```
+4. Set strong secrets in `.env`:
+- `INTEGRATION_API_KEY`
+- `RBAC_KEYS`
+5. Run API:
+```bash
+uvicorn app.main:app --reload --app-dir backend
+```
+6. Open frontend with a local static server and load `frontend/index.html`.
+7. Run tests:
+```bash
+python -m pytest -q
+```
+
+## Configuration
+
+Important env flags:
+
+- `RBAC_ENABLED=true`
+- `INTEGRATION_AUTH_REQUIRED=true`
+- `CHAT_AUTH_REQUIRED=true`
+- `STREAM_ALLOW_QUERY_USER_KEY=false`
+- `CORS_ORIGINS=http://127.0.0.1:5500` (set your real origin in production)
+- `LLM_PROVIDER=none|ollama|gemini`
+
+Recommended:
+- Keep `LLM_PROVIDER=none` for fully offline demo mode.
+- Use `ollama` for local free LLM integration.
+
+## Authentication and Authorization
+
+Integration endpoints:
+- Protected by `X-API-Key` when `INTEGRATION_AUTH_REQUIRED=true`.
+- Fail-closed if auth is enabled but server key is not configured.
+
+RBAC endpoints:
+- Use `X-User-Key` mapped by `RBAC_KEYS`.
+- Role scopes:
+  - `analyst`: read and analyst operations
+  - `manager`: management operations, reports, outbound stats
+  - `admin`: full access
+
+Chat:
+- `POST /chat` requires `X-User-Key` when `CHAT_AUTH_REQUIRED=true`.
+
+Stream:
+- `GET /stream/soc-live` requires `X-User-Key` header by default.
+- Query auth (`user_key`) is disabled by default.
+
+## Main API Surface
+
+Integrations:
+- `POST /integrations/snort/alerts`
+- `POST /integrations/openvas/scan`
+- `POST /integrations/openvas/scan/active`
+- `POST /integrations/nmap/scan/active`
+
+Scans:
+- `POST /scans/jobs`
+- `GET /scans/jobs`
+- `GET /scans/jobs/{id}`
+- `POST /scans/jobs/{id}/run`
+
+Incidents and SOC metrics:
+- `GET /incidents`
+- `GET /incidents/stats/summary`
+- `PATCH /incidents/{id}/status`
+- `GET /incidents/{id}/audit`
+
+Knowledge base:
+- `GET /knowledge/cves/search`
+- `GET /knowledge/cves/{cve_id}`
+- `POST /knowledge/cves/seed/real-world`
+- `POST /knowledge/cves/import/nvd`
+
+Ops visibility:
+- `GET /assets/discovered`
+- `GET /errors`
+- `GET /errors/stats/summary`
+- `GET /outbound/events`
+- `GET /outbound/events/stats/summary`
+- `GET /stream/soc-live`
+
+Reports:
+- `GET /reports/operations`
+- `GET /reports/operations/markdown`
+
+## Chat Commands (Examples)
+
+- `help`
+- `full check 127.0.0.1`
+- `scan 10.0.0.5`
+- `show incidents`
+- `incident stats`
+- `show critical cves`
+- `search cve apache`
+- `show errors`
+- `error stats`
+- `analyze threats`
+- `system status`
+- `roadmap`
+
+## Security Checklist
 
 - Do not commit real `.env` values.
-- Restrict `CORS_ORIGINS` in production.
-- Integration endpoints are fail-closed when `INTEGRATION_AUTH_REQUIRED=true`.
-- `POST /chat` requires RBAC key when `CHAT_AUTH_REQUIRED=true`.
-- Use RBAC for analyst/manager/admin via `X-User-Key` header.
-- `user_key` in stream query is disabled by default (`STREAM_ALLOW_QUERY_USER_KEY=false`).
-- Frontend rendering uses safe text output to avoid XSS.
-- Outbound integrations are idempotent per channel/event key and support retries.
+- Rotate secrets if they were ever committed.
+- Restrict CORS origins in production.
+- Use long random keys for `INTEGRATION_API_KEY` and `RBAC_KEYS`.
+- Keep `STREAM_ALLOW_QUERY_USER_KEY=false`.
+- Keep TLS and reverse-proxy auth in real deployment.
+- Review `/errors` access policy before public exposure.
 
 ## LLM Modes
 
-- `LLM_PROVIDER=none`: no external LLM calls, fully offline backend logic.
-- `LLM_PROVIDER=ollama`: local free model via Ollama API (`OLLAMA_BASE_URL`, `OLLAMA_MODEL`).
-  - Optional token for remote endpoint: `OLLAMA_API_KEY`.
-- `LLM_PROVIDER=gemini`: cloud Gemini API with `GEMINI_API_KEY`.
+- `LLM_PROVIDER=none`: offline logic only.
+- `LLM_PROVIDER=ollama`: local model endpoint (`OLLAMA_BASE_URL`, `OLLAMA_MODEL`).
+- `LLM_PROVIDER=gemini`: cloud model (`GEMINI_API_KEY` required).
 
-### Ollama Quick Start (free local)
+Ollama quick example:
 
-1. Install Ollama and run it locally (default API: `http://localhost:11434`).
-2. Pull a model:
-   - `ollama pull llama3.2:3b`
-3. In `.env` set:
-   - `LLM_PROVIDER=ollama`
-   - `OLLAMA_MODEL=llama3.2:3b`
-4. Restart backend.
+```bash
+ollama pull llama3.2:3b
+```
 
-## Demo Checklist
+`.env`:
+- `LLM_PROVIDER=ollama`
+- `OLLAMA_MODEL=llama3.2:3b`
 
-- Ingest sample Snort alert.
-- Trigger OpenVAS active scan and inspect findings.
-- Show incident records created by integrations.
-- Show CVE lookup and mitigation guidance.
-- Show error search/statistics endpoint after forced integration failure.
+## Demo Flow (5-7 Minutes)
+
+1. Seed threat pack: `POST /knowledge/cves/seed/real-world`.
+2. Send sample Snort alert.
+3. Run active scan on test host.
+4. Open incidents and incident stats.
+5. Show discovered assets and scan queue.
+6. Show errors/outbound stats.
+7. Export markdown operations report.
+
+## Testing
+
+Run:
+
+```bash
+python -m pytest -q
+```
+
+Acceptance tests cover:
+- auth guards
+- RBAC restrictions
+- scan job lifecycle
+- stream access behavior
+- outbound retry/idempotency
+- incident/error/report flows
