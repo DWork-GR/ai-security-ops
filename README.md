@@ -1,34 +1,34 @@
 ﻿# AI Security Ops
 
-Integration-first SOC assistant for a cybersecurity bachelor diploma project.
+Integration-first SOC асистент для бакалаврського дипломного проєкту з кібербезпеки.
 
-The project focuses on security operations workflows:
+Проєкт зосереджений на процесах security operations:
 `Ingest -> Normalize -> Correlate -> Prioritize -> Recommend -> Track`
 
-## What This Project Does
+## Що робить цей проєкт
 
-- Accepts events from integrations (Snort, OpenVAS/Nmap style scans).
-- Correlates findings into incidents with ATT&CK enrichment.
-- Tracks scan jobs, assets, errors, and outbound notification delivery.
-- Provides analyst chat commands for quick SOC actions.
-- Generates operational summaries for reports and demos.
+- Приймає події з інтеграцій (Snort, скани у стилі OpenVAS/Nmap).
+- Корелює результати у інциденти з enrichment за MITRE ATT&CK.
+- Відстежує scan jobs, активи, помилки та доставку outbound-сповіщень.
+- Дає чат-команди для швидких SOC-дій аналітика.
+- Формує операційні підсумки для звітів і демонстрації.
 
-## Architecture
+## Архітектура
 
 Backend:
-- `FastAPI` + `SQLAlchemy` + SQLite/PostgreSQL compatible config
-- Modular API routers (`integrations`, `incidents`, `scans`, `assets`, `knowledge`, `errors`, `outbound`, `reports`, `stream`, `chat`)
+- `FastAPI` + `SQLAlchemy` + сумісна конфігурація SQLite/PostgreSQL
+- Модульні роутери API (`integrations`, `incidents`, `scans`, `assets`, `knowledge`, `errors`, `outbound`, `reports`, `stream`, `chat`)
 
 Frontend:
-- Static HTML/CSS/JS SOC console
-- Chat workspace + queue status + discovered assets + live feed
+- Статична SOC-консоль на HTML/CSS/JS
+- Chat workspace + статус черги + знайдені активи + live feed
 
-Core security model:
-- Integration auth via `X-API-Key`
-- RBAC via `X-User-Key` (`analyst`, `manager`, `admin`)
-- Sensitive values redacted in error pipeline
+Базова модель безпеки:
+- Авторизація інтеграцій через `X-API-Key`
+- RBAC через `X-User-Key` (`analyst`, `manager`, `admin`)
+- Редакція чутливих значень у пайплайні помилок
 
-## Repository Layout
+## Структура репозиторію
 
 ```text
 backend/
@@ -42,92 +42,92 @@ tests/
 docs/
 ```
 
-## Quick Start
+## Швидкий старт
 
-1. Create and activate virtual environment.
-2. Install dependencies:
+1. Створіть і активуйте віртуальне середовище.
+2. Встановіть залежності:
 ```bash
 pip install -r backend/requirements.txt
 ```
-3. Create local config:
+3. Створіть локальну конфігурацію:
 ```bash
 copy .env.example .env
 ```
-4. Set strong secrets in `.env`:
+4. Встановіть надійні секрети у `.env`:
 - `INTEGRATION_API_KEY`
 - `RBAC_KEYS`
-5. Run API:
+5. Запустіть API:
 ```bash
 uvicorn app.main:app --reload --app-dir backend
 ```
-6. Open frontend with a local static server and load `frontend/index.html`.
-7. Run tests:
+6. Відкрийте frontend через локальний static server та завантажте `frontend/index.html`.
+7. Запустіть тести:
 ```bash
 python -m pytest -q
 ```
 
-## Configuration
+## Конфігурація
 
-Important env flags:
+Ключові env-параметри:
 
 - `RBAC_ENABLED=true`
 - `INTEGRATION_AUTH_REQUIRED=true`
 - `CHAT_AUTH_REQUIRED=true`
 - `STREAM_ALLOW_QUERY_USER_KEY=false`
-- `CORS_ORIGINS=http://127.0.0.1:5500` (set your real origin in production)
+- `CORS_ORIGINS=http://127.0.0.1:5500` (у production вкажіть реальний origin)
 - `LLM_PROVIDER=none|ollama|gemini`
 
-Recommended:
-- Keep `LLM_PROVIDER=none` for fully offline demo mode.
-- Use `ollama` for local free LLM integration.
+Рекомендації:
+- Для повністю офлайн-демо використовуйте `LLM_PROVIDER=none`.
+- Для локальної безкоштовної LLM-інтеграції використовуйте `ollama`.
 
-## Authentication and Authorization
+## Автентифікація та авторизація
 
 Integration endpoints:
-- Protected by `X-API-Key` when `INTEGRATION_AUTH_REQUIRED=true`.
-- Fail-closed if auth is enabled but server key is not configured.
+- Захищені через `X-API-Key`, коли `INTEGRATION_AUTH_REQUIRED=true`.
+- Працюють у fail-closed режимі, якщо auth увімкнено, але серверний ключ не налаштовано.
 
 RBAC endpoints:
-- Use `X-User-Key` mapped by `RBAC_KEYS`.
-- Role scopes:
-  - `analyst`: read and analyst operations
-  - `manager`: management operations, reports, outbound stats
-  - `admin`: full access
+- Використовують `X-User-Key`, який мапиться через `RBAC_KEYS`.
+- Ролі:
+  - `analyst`: читання і дії аналітика
+  - `manager`: керівні операції, звіти, outbound-статистика
+  - `admin`: повний доступ
 
 Chat:
-- `POST /chat` requires `X-User-Key` when `CHAT_AUTH_REQUIRED=true`.
+- `POST /chat` вимагає `X-User-Key`, коли `CHAT_AUTH_REQUIRED=true`.
 
 Stream:
-- `GET /stream/soc-live` requires `X-User-Key` header by default.
-- Query auth (`user_key`) is disabled by default.
+- `GET /stream/soc-live` за замовчуванням вимагає header `X-User-Key`.
+- Query-автентифікація (`user_key`) за замовчуванням вимкнена.
 
-## Main API Surface
+## Основні API-ендпоінти
 
-Integrations:
+Інтеграції:
 - `POST /integrations/snort/alerts`
 - `POST /integrations/openvas/scan`
 - `POST /integrations/openvas/scan/active`
 - `POST /integrations/nmap/scan/active`
 
-Scans:
+Сканування:
 - `POST /scans/jobs`
 - `GET /scans/jobs`
 - `GET /scans/jobs/{id}`
 - `POST /scans/jobs/{id}/run`
 
-Incidents and SOC metrics:
+Інциденти та SOC-метрики:
 - `GET /incidents`
 - `GET /incidents/stats/summary`
 - `PATCH /incidents/{id}/status`
 - `GET /incidents/{id}/audit`
 
-Knowledge base:
+База знань:
 - `GET /knowledge/cves/search`
 - `GET /knowledge/cves/{cve_id}`
 - `POST /knowledge/cves/seed/real-world`
 - `POST /knowledge/cves/import/nvd`
 
-Ops visibility:
+Операційна видимість:
 - `GET /assets/discovered`
 - `GET /errors`
 - `GET /errors/stats/summary`
@@ -135,11 +135,11 @@ Ops visibility:
 - `GET /outbound/events/stats/summary`
 - `GET /stream/soc-live`
 
-Reports:
+Звіти:
 - `GET /reports/operations`
 - `GET /reports/operations/markdown`
 
-## Chat Commands (Examples)
+## Чат-команди (приклади)
 
 - `help`
 - `full check 127.0.0.1`
@@ -156,52 +156,52 @@ Reports:
 
 ## Security Checklist
 
-- Do not commit real `.env` values.
-- Rotate secrets if they were ever committed.
-- Restrict CORS origins in production.
-- Use long random keys for `INTEGRATION_API_KEY` and `RBAC_KEYS`.
-- Keep `STREAM_ALLOW_QUERY_USER_KEY=false`.
-- Keep TLS and reverse-proxy auth in real deployment.
-- Review `/errors` access policy before public exposure.
+- Не комітьте реальні значення `.env`.
+- Ротуйте секрети, якщо вони колись потрапляли в git.
+- Обмежуйте CORS origins у production.
+- Використовуйте довгі випадкові ключі для `INTEGRATION_API_KEY` і `RBAC_KEYS`.
+- Залишайте `STREAM_ALLOW_QUERY_USER_KEY=false`.
+- У реальному деплої вмикайте TLS і auth на рівні reverse proxy.
+- Перегляньте політику доступу до `/errors` перед публічним запуском.
 
-## LLM Modes
+## LLM режими
 
-- `LLM_PROVIDER=none`: offline logic only.
-- `LLM_PROVIDER=ollama`: local model endpoint (`OLLAMA_BASE_URL`, `OLLAMA_MODEL`).
-- `LLM_PROVIDER=gemini`: cloud model (`GEMINI_API_KEY` required).
+- `LLM_PROVIDER=none`: лише офлайн-логіка.
+- `LLM_PROVIDER=ollama`: локальна модель (`OLLAMA_BASE_URL`, `OLLAMA_MODEL`).
+- `LLM_PROVIDER=gemini`: хмарна модель (`GEMINI_API_KEY` обов'язковий).
 
-Ollama quick example:
+Швидкий приклад для Ollama:
 
 ```bash
 ollama pull llama3.2:3b
 ```
 
-`.env`:
+У `.env`:
 - `LLM_PROVIDER=ollama`
 - `OLLAMA_MODEL=llama3.2:3b`
 
-## Demo Flow (5-7 Minutes)
+## Демо-сценарій (5-7 хвилин)
 
-1. Seed threat pack: `POST /knowledge/cves/seed/real-world`.
-2. Send sample Snort alert.
-3. Run active scan on test host.
-4. Open incidents and incident stats.
-5. Show discovered assets and scan queue.
-6. Show errors/outbound stats.
-7. Export markdown operations report.
+1. Засійте threat pack: `POST /knowledge/cves/seed/real-world`.
+2. Надішліть тестову Snort-подію.
+3. Запустіть активне сканування тестового хоста.
+4. Відкрийте інциденти та incident stats.
+5. Покажіть знайдені активи та scan queue.
+6. Покажіть errors/outbound stats.
+7. Експортуйте markdown operations report.
 
-## Testing
+## Тестування
 
-Run:
+Запуск:
 
 ```bash
 python -m pytest -q
 ```
 
-Acceptance tests cover:
+Acceptance-тести покривають:
 - auth guards
 - RBAC restrictions
-- scan job lifecycle
-- stream access behavior
+- життєвий цикл scan jobs
+- поведінку доступу до stream
 - outbound retry/idempotency
-- incident/error/report flows
+- сценарії incidents/errors/reports
