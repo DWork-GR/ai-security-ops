@@ -13,6 +13,13 @@ else:
     load_dotenv()
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _resolve_database_url(raw_url: str) -> str:
     if not raw_url:
         DEFAULT_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -41,6 +48,9 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 DATABASE_URL = _resolve_database_url(os.getenv("DATABASE_URL", ""))
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://127.0.0.1:5500")
 INTEGRATION_API_KEY = os.getenv("INTEGRATION_API_KEY", "")
+INTEGRATION_AUTH_REQUIRED = _env_bool("INTEGRATION_AUTH_REQUIRED", True)
+CHAT_AUTH_REQUIRED = _env_bool("CHAT_AUTH_REQUIRED", True)
+STREAM_ALLOW_QUERY_USER_KEY = _env_bool("STREAM_ALLOW_QUERY_USER_KEY", False)
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "none").strip().lower()
 OLLAMA_BASE_URL = os.getenv(
     "OLLAMA_BASE_URL",
@@ -49,7 +59,7 @@ OLLAMA_BASE_URL = os.getenv(
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b").strip()
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "").strip()
 RBAC_KEYS = os.getenv("RBAC_KEYS", "").strip()
-RBAC_ENABLED = os.getenv("RBAC_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"} or bool(RBAC_KEYS)
+RBAC_ENABLED = _env_bool("RBAC_ENABLED", True)
 
 OUTBOUND_WEBHOOK_URL = os.getenv("OUTBOUND_WEBHOOK_URL", "").strip()
 OUTBOUND_WEBHOOK_TOKEN = os.getenv("OUTBOUND_WEBHOOK_TOKEN", "").strip()

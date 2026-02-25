@@ -23,11 +23,13 @@ from app.database.repository import (
     update_incident_status,
 )
 from app.services.incident_service import calculate_risk_score, infer_asset_from_text
+from app.services.attack_mapping_service import infer_attack_mapping
 
 router = APIRouter(tags=["incidents"])
 
 
 def _serialize_incident(incident) -> IncidentOut:
+    attack = infer_attack_mapping(source=incident.source, message=incident.message)
     return IncidentOut(
         id=str(incident.id),
         source=incident.source,
@@ -41,6 +43,10 @@ def _serialize_incident(incident) -> IncidentOut:
             status=incident.status,
         ),
         asset=infer_asset_from_text(incident.message),
+        attack_tactic=attack["attack_tactic"],
+        attack_technique_id=attack["attack_technique_id"],
+        attack_technique_name=attack["attack_technique_name"],
+        attack_confidence=attack["attack_confidence"],
     )
 
 
@@ -60,6 +66,8 @@ def get_incidents(
     status: str | None = Query(default=None),
     search: str | None = Query(default=None),
     min_risk: float | None = Query(default=None, ge=0, le=100),
+    attack_tactic: str | None = Query(default=None),
+    attack_technique: str | None = Query(default=None, description="Technique ID, e.g. T1190"),
     date_from: datetime | None = Query(default=None),
     date_to: datetime | None = Query(default=None),
     db: Session = Depends(get_db),
@@ -82,6 +90,20 @@ def get_incidents(
     serialized = [_serialize_incident(incident) for incident in incidents]
     if min_risk is not None:
         serialized = [item for item in serialized if item.risk_score >= min_risk]
+    if attack_tactic:
+        normalized_tactic = attack_tactic.strip().lower()
+        serialized = [
+            item
+            for item in serialized
+            if item.attack_tactic and item.attack_tactic.lower() == normalized_tactic
+        ]
+    if attack_technique:
+        normalized_technique = attack_technique.strip().upper()
+        serialized = [
+            item
+            for item in serialized
+            if item.attack_technique_id and item.attack_technique_id.upper() == normalized_technique
+        ]
     return IncidentListResponse(items=serialized)
 
 

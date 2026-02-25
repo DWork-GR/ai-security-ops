@@ -39,12 +39,14 @@ For non-technical users, use chat as a single control panel:
   - GitHub Issues ticketing (free-tier friendly)
   - Optional generic webhook
 - `GET /incidents` to query incident list.
+- ATT&CK enrichment for incidents (auto tactic/technique inference).
 - `GET /incidents/stats/summary` for SOC KPI snapshot.
 - `PATCH /incidents/{id}/status` for incident lifecycle workflow.
 - `GET /incidents/{id}/audit` for status/audit history.
 - `GET /knowledge/cves/search` for CVE filtering by query/severity/CVSS.
 - `POST /knowledge/cves/seed/real-world` to import curated high-impact real-world CVEs.
 - `GET /assets/discovered` to show discovered devices with latest scan/open ports snapshot.
+- `GET /stream/soc-live` for real-time SSE snapshots (incidents/errors/scan jobs/assets).
 - `GET /errors` and `GET /errors/stats/summary` for operational error search.
 - `GET /outbound/events` and `GET /outbound/events/stats/summary` for delivery observability.
 - `GET /reports/operations` for bilingual operations report (EN/UK).
@@ -62,6 +64,7 @@ For non-technical users, use chat as a single control panel:
    - `pip install -r backend/requirements.txt`
 3. Copy env template and set real secrets:
    - `.env.example -> .env`
+   - Generate strong random values for `INTEGRATION_API_KEY` and `RBAC_KEYS`.
    - For no external AI usage set `LLM_PROVIDER=none`.
    - For free local AI set `LLM_PROVIDER=ollama` and run Ollama locally.
 4. Run API:
@@ -75,8 +78,10 @@ For non-technical users, use chat as a single control panel:
 
 - Do not commit real `.env` values.
 - Restrict `CORS_ORIGINS` in production.
-- Protect integration endpoints with `INTEGRATION_API_KEY` and `X-API-Key` header.
-- Optional RBAC for analyst/manager/admin using `X-User-Key` header.
+- Integration endpoints are fail-closed when `INTEGRATION_AUTH_REQUIRED=true`.
+- `POST /chat` requires RBAC key when `CHAT_AUTH_REQUIRED=true`.
+- Use RBAC for analyst/manager/admin via `X-User-Key` header.
+- `user_key` in stream query is disabled by default (`STREAM_ALLOW_QUERY_USER_KEY=false`).
 - Frontend rendering uses safe text output to avoid XSS.
 - Outbound integrations are idempotent per channel/event key and support retries.
 

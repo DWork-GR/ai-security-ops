@@ -19,6 +19,42 @@
   padding: 6px 11px;
 }
 
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lang-label {
+  font-size: 11px;
+  color: var(--txt-soft);
+}
+
+.lang-select {
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid var(--line-soft);
+  background: rgba(7, 18, 37, 0.9);
+  color: var(--txt-main);
+  font-size: 12px;
+  padding: 0 8px;
+}
+
+.lang-select:focus {
+  outline: none;
+  border-color: rgba(79, 160, 255, 0.65);
+}
+
+.status.connecting {
+  color: #102131;
+  background: linear-gradient(140deg, #a9d5ff, #7fb4ff);
+}
+
+.status.degraded {
+  color: #3a1a09;
+  background: linear-gradient(140deg, #ffd28d, #ffb85f);
+}
+
 .panel-card {
   border-radius: 16px;
   border: 1px solid var(--line-soft);
@@ -129,6 +165,29 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+}
+
+.feed-item {
+  border-radius: 11px;
+  border: 1px solid var(--line-soft);
+  background: rgba(7, 18, 37, 0.9);
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.feed-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.feed-source {
+  font-size: 11px;
+  font-weight: 700;
+  color: #dbe8ff;
 }
 
 .asset-head {

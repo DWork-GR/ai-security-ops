@@ -192,7 +192,13 @@ Headers for incident/report/knowledge/error/outbound endpoints when RBAC enabled
 
 ### `GET /incidents`
 Filters:
-- `limit`, `source`, `severity`, `status`, `search`, `min_risk`, `date_from`, `date_to`
+- `limit`, `source`, `severity`, `status`, `search`, `min_risk`, `attack_tactic`, `attack_technique`, `date_from`, `date_to`
+
+Each incident item also includes ATT&CK enrichment:
+- `attack_tactic`
+- `attack_technique_id`
+- `attack_technique_name`
+- `attack_confidence`
 
 ### `PATCH /incidents/{incident_id}/status`
 Request:
@@ -273,7 +279,24 @@ Response:
 }
 ```
 
-## 7) Error Intelligence Endpoints
+## 7) Live Stream Endpoint
+
+### `GET /stream/soc-live`
+Server-Sent Events (SSE) stream for near real-time SOC snapshots.
+
+Query params:
+- `limit` (default `8`)
+- `interval_sec` (default `3.0`)
+- `once` (`true` for a single snapshot, useful for testing)
+- `user_key` (RBAC key for browser EventSource clients when RBAC is enabled)
+
+Stream event format:
+```text
+event: snapshot
+data: {"timestamp":"...","incident_stats":{...},"error_stats":{...},"incidents":[...],"errors":[...],"scan_jobs":[...],"assets":[...]}
+```
+
+## 8) Error Intelligence Endpoints
 
 ### `GET /errors`
 Filters:
@@ -303,7 +326,7 @@ Response:
 ### `GET /errors/stats/summary`
 Manager/admin endpoint with total errors, total occurrences, last-24h counters, and groupings.
 
-## 8) Outbound Delivery Endpoints
+## 9) Outbound Delivery Endpoints
 
 ### `GET /outbound/events`
 Manager/admin endpoint.
@@ -335,7 +358,7 @@ Response:
 ### `GET /outbound/events/stats/summary`
 Manager/admin endpoint with delivery KPIs.
 
-## 9) Report Endpoints
+## 10) Report Endpoints
 
 ### `GET /reports/operations`
 Returns bilingual EN/UK operations summary with incident and error metrics.

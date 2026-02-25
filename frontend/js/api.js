@@ -1,6 +1,10 @@
 const API_BASE = window.API_BASE_URL || "http://127.0.0.1:8000";
 const USER_KEY_STORAGE = "soc_user_key";
 
+export function getApiBase() {
+  return API_BASE;
+}
+
 export function getUserKey() {
   const fromWindow = typeof window.USER_API_KEY === "string" ? window.USER_API_KEY.trim() : "";
   if (fromWindow) return fromWindow;

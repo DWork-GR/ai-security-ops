@@ -100,6 +100,10 @@ class IncidentOut(BaseModel):
     detected_at: datetime
     risk_score: float
     asset: Optional[str] = None
+    attack_tactic: Optional[str] = None
+    attack_technique_id: Optional[str] = None
+    attack_technique_name: Optional[str] = None
+    attack_confidence: Optional[float] = None
 
 
 class IncidentListResponse(BaseModel):

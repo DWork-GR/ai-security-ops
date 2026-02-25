@@ -17,6 +17,9 @@ os.environ["GEMINI_API_KEY"] = ""
 os.environ["LLM_PROVIDER"] = "none"
 os.environ["RBAC_ENABLED"] = "false"
 os.environ["RBAC_KEYS"] = ""
+os.environ["INTEGRATION_AUTH_REQUIRED"] = "false"
+os.environ["CHAT_AUTH_REQUIRED"] = "false"
+os.environ["STREAM_ALLOW_QUERY_USER_KEY"] = "true"
 os.environ["SCAN_WORKER_ENABLED"] = "false"
 
 from app.database.db import Base, engine  # noqa: E402

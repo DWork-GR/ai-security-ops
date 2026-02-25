@@ -12,6 +12,7 @@ from app.api.knowledge import router as knowledge_router
 from app.api.outbound import router as outbound_router
 from app.api.reports import router as reports_router
 from app.api.scans import router as scans_router
+from app.api.stream import router as stream_router
 from app.config import CORS_ORIGINS
 from app.database.db import Base, engine
 from app.services.scan_job_worker import start_scan_worker, stop_scan_worker
@@ -39,7 +40,7 @@ app.add_middleware(
     allow_origins=[origin.strip() for origin in cors_origins if origin.strip()],
     allow_credentials=False,
     allow_methods=["GET", "POST", "PATCH"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type", "Accept", "X-User-Key", "X-API-Key"],
 )
 
 app.include_router(chat_router)
@@ -51,6 +52,7 @@ app.include_router(errors_router)
 app.include_router(assets_router)
 app.include_router(outbound_router)
 app.include_router(scans_router)
+app.include_router(stream_router)
 
 
 @app.get("/")

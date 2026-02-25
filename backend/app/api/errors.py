@@ -5,6 +5,7 @@ from app.api.rbac import require_roles
 from app.core.schemas import ErrorEventListResponse, ErrorEventOut, ErrorSummaryStatsResponse
 from app.database.db import get_db
 from app.database.repository import get_error_summary_stats, list_error_events
+from app.utils.sanitization import sanitize_sensitive_text
 
 router = APIRouter(prefix="/errors", tags=["errors"])
 
@@ -33,19 +34,19 @@ def get_errors(
 
     return ErrorEventListResponse(
         items=[
-            ErrorEventOut(
-                id=str(item.id),
-                source=item.source,
-                operation=item.operation,
-                error_type=item.error_type,
-                message=item.message,
-                severity=item.severity,
-                fingerprint=item.fingerprint,
-                occurrences=item.occurrences,
-                context=item.context,
-                first_seen_at=item.first_seen_at,
-                last_seen_at=item.last_seen_at,
-            )
+                ErrorEventOut(
+                    id=str(item.id),
+                    source=item.source,
+                    operation=item.operation,
+                    error_type=item.error_type,
+                    message=sanitize_sensitive_text(item.message, max_len=1000),
+                    severity=item.severity,
+                    fingerprint=item.fingerprint,
+                    occurrences=item.occurrences,
+                    context=sanitize_sensitive_text(item.context, max_len=1000) if item.context else None,
+                    first_seen_at=item.first_seen_at,
+                    last_seen_at=item.last_seen_at,
+                )
             for item in items
         ]
     )

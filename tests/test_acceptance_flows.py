@@ -68,6 +68,7 @@ def test_chat_threat_analysis_returns_summary(client):
 def test_integrations_api_key_guard_when_enabled(client, monkeypatch):
     from app.api import dependencies
 
+    monkeypatch.setattr(dependencies, "INTEGRATION_AUTH_REQUIRED", True)
     monkeypatch.setattr(dependencies, "INTEGRATION_API_KEY", "demo-key")
 
     no_key = client.post("/integrations/openvas/scan", json={"target": "10.0.0.5"})
@@ -563,4 +564,109 @@ def test_chat_show_incidents_returns_markdown_table(client):
     assert response.status_code == 200
     payload = response.json()
     assert payload["type"] == "text"
-    assert "| detected_at | severity | status | source | message |" in payload["message"]
+    assert "| detected_at | severity | status | source | ATT&CK | message |" in payload["message"]
+
+
+def test_stream_soc_live_once_returns_snapshot(client):
+    response = client.get("/stream/soc-live", params={"once": "true", "limit": 4})
+    assert response.status_code == 200
+    body = response.text
+    assert "event: snapshot" in body
+    assert '"incident_stats"' in body
+    assert '"scan_jobs"' in body
+
+
+def test_stream_soc_live_rbac_with_query_user_key(client, monkeypatch):
+    from app.api import stream
+
+    monkeypatch.setattr(stream, "RBAC_ENABLED", True)
+    monkeypatch.setattr(stream, "RBAC_KEY_TO_ROLE", {"analyst-key": "analyst"})
+
+    unauthorized = client.get("/stream/soc-live", params={"once": "true"})
+    assert unauthorized.status_code == 401
+
+    authorized = client.get(
+        "/stream/soc-live",
+        params={"once": "true", "user_key": "analyst-key"},
+    )
+    assert authorized.status_code == 200
+    assert "event: snapshot" in authorized.text
+
+
+def test_stream_soc_live_rejects_query_key_when_disabled(client, monkeypatch):
+    from app.api import stream
+
+    monkeypatch.setattr(stream, "RBAC_ENABLED", True)
+    monkeypatch.setattr(stream, "STREAM_ALLOW_QUERY_USER_KEY", False)
+    monkeypatch.setattr(stream, "RBAC_KEY_TO_ROLE", {"analyst-key": "analyst"})
+
+    denied = client.get(
+        "/stream/soc-live",
+        params={"once": "true", "user_key": "analyst-key"},
+    )
+    assert denied.status_code == 401
+
+    allowed = client.get(
+        "/stream/soc-live",
+        params={"once": "true"},
+        headers={"X-User-Key": "analyst-key"},
+    )
+    assert allowed.status_code == 200
+    assert "event: snapshot" in allowed.text
+
+
+def test_chat_requires_key_when_rbac_and_chat_auth_enabled(client, monkeypatch):
+    from app.api import chat, rbac
+
+    monkeypatch.setattr(chat, "CHAT_AUTH_REQUIRED", True)
+    monkeypatch.setattr(rbac, "RBAC_ENABLED", True)
+    monkeypatch.setattr(rbac, "RBAC_KEY_TO_ROLE", {"analyst-key": "analyst"})
+
+    denied = client.post("/chat", json={"message": "help"})
+    assert denied.status_code == 401
+
+    allowed = client.post(
+        "/chat",
+        json={"message": "help"},
+        headers={"X-User-Key": "analyst-key"},
+    )
+    assert allowed.status_code == 200
+    assert allowed.json()["type"] == "text"
+
+
+def test_integrations_fail_closed_when_auth_required_and_server_key_missing(client, monkeypatch):
+    from app.api import dependencies
+
+    monkeypatch.setattr(dependencies, "INTEGRATION_AUTH_REQUIRED", True)
+    monkeypatch.setattr(dependencies, "INTEGRATION_API_KEY", "")
+
+    response = client.post("/integrations/openvas/scan", json={"target": "10.0.0.5"})
+    assert response.status_code == 503
+
+
+def test_incident_items_include_attack_enrichment(client):
+    response = client.post(
+        "/integrations/openvas/scan/active",
+        json={"target": "127.0.0.1", "ports": [22, 80], "timeout_ms": 120},
+    )
+    assert response.status_code == 200
+
+    incidents = client.get("/incidents")
+    assert incidents.status_code == 200
+    items = incidents.json()["items"]
+    assert len(items) >= 1
+    assert any(item.get("attack_technique_id") for item in items)
+
+
+def test_incidents_filter_by_attack_technique(client):
+    response = client.post(
+        "/integrations/openvas/scan/active",
+        json={"target": "127.0.0.1", "ports": [22, 80], "timeout_ms": 120},
+    )
+    assert response.status_code == 200
+
+    filtered = client.get("/incidents", params={"attack_technique": "T1595"})
+    assert filtered.status_code == 200
+    items = filtered.json()["items"]
+    assert len(items) >= 1
+    assert all(item["attack_technique_id"] == "T1595" for item in items)

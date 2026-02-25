@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
+from app.api.rbac import get_current_role
 from app.ai.expert_engine import analyze_alerts_expert
 from app.ai.gemini_client import analyze_security_incidents
+from app.config import CHAT_AUTH_REQUIRED
 from app.core.intent_router import detect_intent
 from app.core.schemas import ChatRequest
 from app.database.db import get_db
@@ -20,10 +22,21 @@ from app.database.repository import (
 from app.integrations.openvas.validator import is_valid_ip
 from app.integrations.snort.analyzer import get_critical_alerts
 from app.services.error_service import record_exception
+from app.services.attack_mapping_service import infer_attack_mapping
 from app.services.incident_service import correlate_incident
 from app.services.scan_service import run_active_scan
 
 router = APIRouter()
+
+
+def _ensure_chat_access(x_user_key: str | None) -> str:
+    if not CHAT_AUTH_REQUIRED:
+        return "chat"
+
+    role = get_current_role(x_user_key)
+    if role not in {"analyst", "manager", "admin"}:
+        raise HTTPException(status_code=403, detail="Insufficient role")
+    return role
 
 
 def _serialize_cves(cves):
@@ -46,14 +59,16 @@ def _format_incident_rows(incidents) -> str:
     lines = [
         "[Incidents] Latest SOC incidents:",
         "",
-        "| detected_at | severity | status | source | message |",
-        "| --- | --- | --- | --- | --- |",
+        "| detected_at | severity | status | source | ATT&CK | message |",
+        "| --- | --- | --- | --- | --- | --- |",
     ]
     for incident in incidents:
         message = (incident.message or "").replace("|", "/").replace("\n", " ").strip()
+        attack = infer_attack_mapping(source=incident.source, message=incident.message)
+        attack_tag = attack["attack_technique_id"] or "n/a"
         lines.append(
             f"| {incident.detected_at.isoformat()} | {incident.severity} | "
-            f"{incident.status} | {incident.source} | {message} |"
+            f"{incident.status} | {incident.source} | {attack_tag} | {message} |"
         )
     return "\n".join(lines)
 
@@ -311,7 +326,12 @@ def _format_full_check_summary(
 
 
 @router.post("/chat")
-def process_message(request: ChatRequest, db: Session = Depends(get_db)):
+def process_message(
+    request: ChatRequest,
+    db: Session = Depends(get_db),
+    x_user_key: str | None = Header(default=None, alias="X-User-Key"),
+):
+    chat_actor_role = _ensure_chat_access(x_user_key)
     try:
         message = request.message.strip()
         intent, entities = detect_intent(message)
@@ -432,7 +452,7 @@ def process_message(request: ChatRequest, db: Session = Depends(get_db)):
                     message=alert_message,
                     severity="HIGH",
                     signature=alert_message,
-                    actor_role="chat",
+                    actor_role=chat_actor_role,
                 )
                 if created:
                     created_count += 1

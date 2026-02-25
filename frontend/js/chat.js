@@ -3,10 +3,12 @@ import {
   removeMessage,
   renderCves,
   renderDiscoveredAssets,
+  renderLiveFeed,
   renderScanJobs,
 } from "./render.js";
 import {
   createScanJob,
+  getApiBase,
   getUserKey,
   listDiscoveredAssets,
   listScanJobs,
@@ -14,6 +16,14 @@ import {
   sendToBackend,
   setUserKey,
 } from "./api.js";
+import {
+  applyUiTranslations,
+  getLang,
+  localizeAssistantText,
+  localizeStatusToken,
+  setLang,
+  t,
+} from "./i18n.js";
 
 const input = document.getElementById("input");
 const form = document.getElementById("chat-form");
@@ -25,10 +35,30 @@ const scanControlsEl = document.getElementById("scan-controls");
 const scanJobsEl = document.getElementById("scan-jobs");
 const discoveredAssetsEl = document.getElementById("discovered-assets");
 const seedThreatPackBtn = document.getElementById("seed-threat-pack");
+const liveFeedEl = document.getElementById("live-feed");
+const socStatusEl = document.getElementById("soc-connection-status");
+const langSelectEl = document.getElementById("lang-select");
 let scanJobsTimerId = null;
 let discoveredAssetsTimerId = null;
+let socStream = null;
+let socReconnectTimerId = null;
+let streamFirstSnapshotReceived = false;
+let latestCriticalIncidentId = null;
 let scanAuthWarningShown = false;
 let discoveredAssetsAuthWarningShown = false;
+
+function localizeScanType(scanType) {
+  const key = `ui_scan_${String(scanType || "").toLowerCase()}`;
+  const translated = t(key);
+  if (translated === key) {
+    return String(scanType || "").toUpperCase();
+  }
+  const mode = getLang();
+  if (mode === "en") {
+    return translated.toUpperCase();
+  }
+  return translated;
+}
 
 async function handleSend(forcedText = null) {
   if (!input) return;
@@ -38,7 +68,7 @@ async function handleSend(forcedText = null) {
 
   input.value = "";
   renderMessage("user", text);
-  const loader = renderMessage("system", "Analyzing request...");
+  const loader = renderMessage("system", t("chat_analyzing"));
 
   try {
     const data = await sendToBackend(text);
@@ -50,14 +80,14 @@ async function handleSend(forcedText = null) {
     }
 
     if (data.type === "text") {
-      renderMessage("assistant", data.message || "No message returned.");
+      renderMessage("assistant", localizeAssistantText(data.message || t("chat_no_message")));
       return;
     }
 
-    renderMessage("error", "Unknown backend response format.");
+    renderMessage("error", t("chat_unknown_format"));
   } catch (err) {
     removeMessage(loader);
-    renderMessage("error", `Connection error: ${String(err.message || err)}`);
+    renderMessage("error", `${t("chat_connection_error")}: ${String(err.message || err)}`);
   }
 }
 
@@ -82,7 +112,7 @@ async function refreshScanJobs() {
       if (!scanAuthWarningShown) {
         renderMessage(
           "error",
-          "RBAC enabled: set 'User Key (RBAC)' in Scan Center to access scan jobs.",
+          t("chat_rbac_scan_jobs"),
         );
         scanAuthWarningShown = true;
       }
@@ -114,7 +144,7 @@ async function refreshDiscoveredAssets() {
       if (!discoveredAssetsAuthWarningShown) {
         renderMessage(
           "error",
-          "RBAC enabled: set 'User Key (RBAC)' in Scan Center to access discovered devices.",
+          t("chat_rbac_assets"),
         );
         discoveredAssetsAuthWarningShown = true;
       }
@@ -130,15 +160,113 @@ function startDiscoveredAssetsPolling() {
   discoveredAssetsTimerId = window.setInterval(refreshDiscoveredAssets, 5000);
 }
 
+function stopPollingFallbacks() {
+  if (scanJobsTimerId) {
+    window.clearInterval(scanJobsTimerId);
+    scanJobsTimerId = null;
+  }
+  if (discoveredAssetsTimerId) {
+    window.clearInterval(discoveredAssetsTimerId);
+    discoveredAssetsTimerId = null;
+  }
+}
+
+function ensurePollingFallbacks() {
+  startScanJobsPolling();
+  startDiscoveredAssetsPolling();
+}
+
+function setSocStatus(mode, label) {
+  if (!socStatusEl) return;
+  socStatusEl.classList.remove("connecting", "degraded");
+  if (mode === "connecting") socStatusEl.classList.add("connecting");
+  if (mode === "degraded") socStatusEl.classList.add("degraded");
+  socStatusEl.textContent = label || t("status_connected");
+}
+
+function maybeNotifyCritical(incidents) {
+  if (!Array.isArray(incidents) || incidents.length === 0) return;
+  const critical = incidents.find((item) => String(item.severity || "").toUpperCase() === "CRITICAL");
+  if (!critical || !critical.id) return;
+  if (latestCriticalIncidentId === critical.id) return;
+
+  if (streamFirstSnapshotReceived) {
+    const details = localizeAssistantText(critical.message || t("chat_live_no_details"));
+    renderMessage(
+      "assistant",
+      `${t("chat_live_alert")}\n${t("chat_live_critical")} ${critical.source || t("render_unknown")}\n${details}`,
+    );
+  }
+  latestCriticalIncidentId = critical.id;
+}
+
+function connectSocStream() {
+  if (socReconnectTimerId) {
+    window.clearTimeout(socReconnectTimerId);
+    socReconnectTimerId = null;
+  }
+  if (socStream) {
+    socStream.close();
+    socStream = null;
+  }
+
+  const userKey = getUserKey();
+  if (userKey) {
+    // Browser EventSource cannot set custom auth headers.
+    // To avoid leaking keys in URL query, switch to authenticated polling endpoints.
+    setSocStatus("degraded", t("status_fallback"));
+    ensurePollingFallbacks();
+    return;
+  }
+
+  const query = new URLSearchParams({ limit: "8", interval_sec: "3" });
+
+  const streamUrl = `${getApiBase()}/stream/soc-live?${query.toString()}`;
+  setSocStatus("connecting", t("status_connecting"));
+
+  const stream = new EventSource(streamUrl);
+  socStream = stream;
+
+  stream.addEventListener("snapshot", (event) => {
+    try {
+      const payload = JSON.parse(event.data || "{}");
+      renderScanJobs(scanJobsEl, payload.scan_jobs || []);
+      renderDiscoveredAssets(discoveredAssetsEl, payload.assets || []);
+      renderLiveFeed(liveFeedEl, payload.incidents || [], payload.errors || []);
+      maybeNotifyCritical(payload.incidents || []);
+      streamFirstSnapshotReceived = true;
+      stopPollingFallbacks();
+    } catch (_) {
+      // Ignore malformed snapshot event.
+    }
+  });
+
+  stream.onopen = () => {
+    setSocStatus("", t("status_live"));
+  };
+
+  stream.onerror = () => {
+    if (socStream) {
+      socStream.close();
+      socStream = null;
+    }
+    setSocStatus("degraded", t("status_fallback"));
+    ensurePollingFallbacks();
+    if (!socReconnectTimerId) {
+      socReconnectTimerId = window.setTimeout(connectSocStream, 3500);
+    }
+  };
+}
+
 async function handleScanJobTrigger(scanType) {
   const targetIp = getScanTarget();
-  const loader = renderMessage("system", `Queueing ${scanType} scan for ${targetIp}...`);
+  const loader = renderMessage("system", `${t("chat_queueing_scan")}: ${localizeScanType(scanType)} ${targetIp}...`);
   try {
     const job = await createScanJob(targetIp, scanType);
     removeMessage(loader);
     renderMessage(
       "assistant",
-      `Scan job queued: ${job.scan_type.toUpperCase()} ${job.target_ip}\nJob ID: ${job.id}\nStatus: ${job.status}`,
+      `${t("chat_scan_queued")}: ${localizeScanType(job.scan_type)} ${job.target_ip}\n${t("chat_scan_job_id")}: ${job.id}\n${t("chat_scan_status")}: ${localizeStatusToken(job.status) || job.status}`,
     );
     refreshScanJobs();
   } catch (err) {
@@ -146,40 +274,34 @@ async function handleScanJobTrigger(scanType) {
     if (err && err.status === 401) {
       renderMessage(
         "error",
-        "Unauthorized for scan jobs. Enter valid RBAC User Key (manager/admin/analyst) in Scan Center.",
+        t("chat_scan_unauthorized"),
       );
       return;
     }
-    renderMessage("error", `Failed to queue scan job: ${String(err.message || err)}`);
+    renderMessage("error", `${t("chat_scan_failed")}: ${String(err.message || err)}`);
   }
 }
 
 async function handleSeedThreatPack() {
-  const loader = renderMessage("system", "Importing real-world threat pack...");
+  const loader = renderMessage("system", t("chat_seed_loading"));
   try {
     const result = await seedRealWorldThreats();
     removeMessage(loader);
     renderMessage(
       "assistant",
-      `[Threat Intel]\nPack loaded: ${result.source}\nImported: ${result.imported_total}\nCreated: ${result.created}\nUpdated: ${result.updated}`,
+      `${t("chat_seed_header")}\n${t("chat_seed_pack_loaded")}: ${result.source}\n${t("chat_seed_imported")}: ${result.imported_total}\n${t("chat_seed_created")}: ${result.created}\n${t("chat_seed_updated")}: ${result.updated}`,
     );
   } catch (err) {
     removeMessage(loader);
     if (err && err.status === 401) {
-      renderMessage(
-        "error",
-        "Unauthorized. Real threat pack import requires manager/admin RBAC key.",
-      );
+      renderMessage("error", t("chat_seed_unauthorized"));
       return;
     }
     if (err && err.status === 403) {
-      renderMessage(
-        "error",
-        "Forbidden. Real threat pack import requires manager/admin role.",
-      );
+      renderMessage("error", t("chat_seed_forbidden"));
       return;
     }
-    renderMessage("error", `Threat pack import failed: ${String(err.message || err)}`);
+    renderMessage("error", `${t("chat_seed_failed")}: ${String(err.message || err)}`);
   }
 }
 
@@ -224,10 +346,22 @@ if (userKeyInput) {
     setUserKey(userKeyInput.value);
     scanAuthWarningShown = false;
     discoveredAssetsAuthWarningShown = false;
+    streamFirstSnapshotReceived = false;
     startScanJobsPolling();
     refreshScanJobs();
     startDiscoveredAssetsPolling();
     refreshDiscoveredAssets();
+    connectSocStream();
+  });
+}
+
+if (langSelectEl) {
+  langSelectEl.value = getLang();
+  langSelectEl.addEventListener("change", () => {
+    setLang(langSelectEl.value);
+    applyUiTranslations();
+    setSocStatus("", t("status_connected"));
+    connectSocStream();
   });
 }
 
@@ -239,10 +373,12 @@ if (seedThreatPackBtn) {
 
 startScanJobsPolling();
 startDiscoveredAssetsPolling();
+applyUiTranslations();
+connectSocStream();
 
 if (document.getElementById("messages")?.children.length === 0) {
   renderMessage(
     "assistant",
-    "Workspace ready. Start with Scan Center on the left, or run a quick command from Quick Commands.",
+    t("chat_workspace_ready"),
   );
 }

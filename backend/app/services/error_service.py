@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.database.repository import create_or_increment_error_event
+from app.utils.sanitization import sanitize_sensitive_text
 
 IP_REGEX = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 HEX_REGEX = re.compile(r"\b[0-9a-f]{8,}\b", re.IGNORECASE)
@@ -44,7 +45,8 @@ def _format_context(context: dict[str, Any] | None) -> str | None:
         return None
     chunks: list[str] = []
     for key, value in context.items():
-        chunks.append(f"{key}={value}")
+        sanitized = sanitize_sensitive_text(str(value), max_len=160)
+        chunks.append(f"{key}={sanitized}")
     return ";".join(chunks)[:1000]
 
 
@@ -58,7 +60,7 @@ def record_exception(
     context: dict[str, Any] | None = None,
 ):
     error_type = exc.__class__.__name__
-    message = str(exc) or error_type
+    message = sanitize_sensitive_text(str(exc) or error_type, max_len=1000) or error_type
     fingerprint = build_error_fingerprint(
         source=source,
         operation=operation,

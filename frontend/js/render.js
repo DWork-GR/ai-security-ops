@@ -1,3 +1,5 @@
+import { localizeStatusToken, t } from "./i18n.js";
+
 const messagesEl = document.getElementById("messages");
 
 function appendAndScroll(el) {
@@ -368,15 +370,15 @@ export function renderCves(cves) {
 
     const cveId = document.createElement("div");
     cveId.className = "cve-id";
-    cveId.textContent = cve.cve_id || "Unknown CVE";
+    cveId.textContent = cve.cve_id || "CVE";
 
     const description = document.createElement("div");
     description.className = "cve-description";
-    description.textContent = cve.description || "No description";
+    description.textContent = cve.description || t("render_unknown");
 
     const mitigation = document.createElement("div");
     mitigation.className = "cve-mitigation";
-    mitigation.textContent = `Mitigation: ${cve.mitigation || "Not provided"}`;
+    mitigation.textContent = `${t("render_mitigation")}: ${cve.mitigation || t("render_unknown")}`;
 
     card.appendChild(header);
     card.appendChild(cveId);
@@ -393,7 +395,7 @@ export function renderResultBlock(title = "Result") {
 
   const titleEl = document.createElement("div");
   titleEl.className = "result-title";
-  titleEl.textContent = title;
+  titleEl.textContent = title === "Result" ? t("render_result_title") : title;
 
   const content = document.createElement("div");
   content.className = "result-content";
@@ -411,7 +413,7 @@ export function renderScanJobs(container, jobs) {
   if (!Array.isArray(jobs) || jobs.length === 0) {
     const empty = document.createElement("div");
     empty.className = "scan-jobs-empty";
-    empty.textContent = "No scan jobs yet.";
+    empty.textContent = t("render_scan_jobs_empty");
     container.appendChild(empty);
     return;
   }
@@ -425,18 +427,22 @@ export function renderScanJobs(container, jobs) {
 
     const left = document.createElement("div");
     left.className = "scan-job-type";
-    left.textContent = `${String(job.scan_type || "").toUpperCase()} | ${job.target_ip}`;
+    const scanTypeKey = `ui_scan_${String(job.scan_type || "").toLowerCase()}`;
+    const scanTypeLabel = t(scanTypeKey) === scanTypeKey
+      ? String(job.scan_type || "").toUpperCase()
+      : t(scanTypeKey);
+    left.textContent = `${scanTypeLabel} | ${job.target_ip}`;
 
     const status = document.createElement("span");
     status.className = `scan-job-status ${String(job.status || "queued").toLowerCase()}`;
-    status.textContent = String(job.status || "queued").toUpperCase();
+    status.textContent = localizeStatusToken(job.status || "queued");
 
     top.appendChild(left);
     top.appendChild(status);
 
     const meta = document.createElement("div");
     meta.className = "scan-job-meta";
-    meta.textContent = `Attempts: ${job.attempts || 0} | Created: ${job.created_at || "n/a"}`;
+    meta.textContent = `${t("render_attempts")}: ${job.attempts || 0} | ${t("render_created")}: ${job.created_at || "n/a"}`;
 
     card.appendChild(top);
     card.appendChild(meta);
@@ -455,11 +461,11 @@ export function renderScanJobs(container, jobs) {
         ? job.result_summary.open_ports.join(", ")
         : "";
       if (openPorts) {
-        summary.textContent = `Open ports: ${openPorts}`;
+        summary.textContent = `${t("render_open_ports")}: ${openPorts}`;
       } else if (Array.isArray(job.result_summary.steps)) {
-        summary.textContent = `Steps: ${job.result_summary.steps.length}`;
+        summary.textContent = `${t("render_steps")}: ${job.result_summary.steps.length}`;
       } else {
-        summary.textContent = "Result available.";
+        summary.textContent = t("render_result_available");
       }
       card.appendChild(summary);
     }
@@ -469,7 +475,7 @@ export function renderScanJobs(container, jobs) {
 }
 
 function formatDateTime(value) {
-  if (!value) return "n/a";
+  if (!value) return t("render_none");
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return String(value);
   return parsed.toLocaleString();
@@ -482,7 +488,7 @@ export function renderDiscoveredAssets(container, assets) {
   if (!Array.isArray(assets) || assets.length === 0) {
     const empty = document.createElement("div");
     empty.className = "scan-jobs-empty";
-    empty.textContent = "No discovered devices yet. Run scans to build inventory.";
+    empty.textContent = t("render_assets_empty");
     container.appendChild(empty);
     return;
   }
@@ -507,23 +513,113 @@ export function renderDiscoveredAssets(container, assets) {
 
     const host = document.createElement("div");
     host.className = "asset-meta";
-    host.textContent = `Host: ${asset.hostname || "unknown"} | Env: ${asset.environment || "unknown"}`;
+    host.textContent = `${t("render_host")}: ${asset.hostname || t("render_unknown")} | ${t("render_env")}: ${asset.environment || t("render_unknown")}`;
 
     const portsRaw = Array.isArray(asset.latest_open_ports) ? asset.latest_open_ports : [];
-    const ports = portsRaw.length ? portsRaw.join(", ") : "none";
+    const ports = portsRaw.length ? portsRaw.join(", ") : t("render_none");
 
     const scan = document.createElement("div");
     scan.className = "asset-meta";
-    scan.textContent = `Open ports: ${ports}`;
+    scan.textContent = `${t("render_open_ports")}: ${ports}`;
 
     const time = document.createElement("div");
     time.className = "asset-meta";
-    time.textContent = `Last seen: ${formatDateTime(asset.last_seen_at)} | Last scan: ${formatDateTime(asset.latest_scan_at)}`;
+    time.textContent = `${t("render_last_seen")}: ${formatDateTime(asset.last_seen_at)} | ${t("render_last_scan")}: ${formatDateTime(asset.latest_scan_at)}`;
 
     card.appendChild(head);
     card.appendChild(host);
     card.appendChild(scan);
     card.appendChild(time);
+    container.appendChild(card);
+  });
+}
+
+function compactText(value, max = 120) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1)}...`;
+}
+
+export function renderLiveFeed(container, incidents, errors) {
+  if (!container) return;
+  container.innerHTML = "";
+
+  const rows = [];
+
+  if (Array.isArray(incidents)) {
+    incidents.forEach((item) => {
+      rows.push({
+        type: "incident",
+        id: item.id,
+        severity: String(item.severity || "MEDIUM").toUpperCase(),
+        source: item.source || "unknown",
+        status: item.status || "new",
+        message: compactText(item.message, 130),
+        at: item.detected_at || "",
+        attack: item.attack_technique_id || "",
+        tactic: item.attack_tactic || "",
+      });
+    });
+  }
+
+  if (Array.isArray(errors)) {
+    errors.forEach((item) => {
+      rows.push({
+        type: "error",
+        id: item.id,
+        severity: String(item.severity || "MEDIUM").toUpperCase(),
+        source: `${item.source || "app"}.${item.operation || "op"}`,
+        status: `${item.error_type || "Error"} x${item.occurrences || 1}`,
+        message: compactText(item.error_type || "Error event", 130),
+        at: item.last_seen_at || "",
+      });
+    });
+  }
+
+  rows.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+
+  if (rows.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "scan-jobs-empty";
+    empty.textContent = t("render_live_empty");
+    container.appendChild(empty);
+    return;
+  }
+
+  rows.slice(0, 12).forEach((item) => {
+    const card = document.createElement("div");
+    card.className = "feed-item";
+
+    const top = document.createElement("div");
+    top.className = "feed-top";
+
+    const left = document.createElement("div");
+    left.className = "feed-source";
+    const typeLabel = item.type === "incident" ? t("render_feed_incident") : t("render_feed_error");
+    left.textContent = `${typeLabel} | ${item.source}`;
+
+    const badge = document.createElement("span");
+    badge.className = `asset-badge ${String(item.severity || "medium").toLowerCase()}`;
+    badge.textContent = item.severity;
+
+    top.appendChild(left);
+    top.appendChild(badge);
+
+    const msg = document.createElement("div");
+    msg.className = "asset-meta";
+    msg.textContent = item.message;
+
+    const meta = document.createElement("div");
+    meta.className = "asset-meta";
+    const attack = item.attack ? ` | ${item.attack}${item.tactic ? ` (${item.tactic})` : ""}` : "";
+    const localizedStatus = item.type === "incident"
+      ? (localizeStatusToken(item.status) || item.status)
+      : item.status;
+    meta.textContent = `${localizedStatus}${attack} | ${formatDateTime(item.at)}`;
+
+    card.appendChild(top);
+    card.appendChild(msg);
+    card.appendChild(meta);
     container.appendChild(card);
   });
 }
