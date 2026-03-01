@@ -227,7 +227,7 @@ def test_openvas_active_scan_returns_structured_findings(client):
     assert payload["target"] == "127.0.0.1"
     assert payload["status"] == "completed"
     assert payload["scanner"] == "openvas"
-    assert payload["discovery_engine"] in {"nmap", "socket-fallback"}
+    assert payload["discovery_engine"] in {"nmap-vuln", "socket-fallback"}
     assert payload["scan_profile"] in {"tcp-default", "tcp-custom"}
     assert payload["scanned_ports"] == 3
     assert "incidents_created" in payload
@@ -538,6 +538,8 @@ def test_knowledge_seed_real_world_pack_is_available(client):
 
 def test_assets_discovered_returns_latest_open_ports(client, monkeypatch):
     from app.services import scan_service
+
+    monkeypatch.setattr(scan_service, "is_nmap_available", lambda: False)
 
     def fake_discover_open_tcp_ports(*, target, ports, timeout_ms):
         return [22, 5432], "socket-fallback"

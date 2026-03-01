@@ -49,9 +49,10 @@ docs/
 ```bash
 pip install -r backend/requirements.txt
 ```
+Для реального active scanning встановіть `nmap` у систему та залишайте `NMAP_ALLOW_SOCKET_FALLBACK=false`.
 3. Створіть локальну конфігурацію:
 ```bash
-copy .env.example .env
+cp .env.example .env
 ```
 4. Встановіть надійні секрети у `.env`:
 - `INTEGRATION_API_KEY`
@@ -76,6 +77,7 @@ python -m pytest -q
 - `STREAM_ALLOW_QUERY_USER_KEY=false`
 - `CORS_ORIGINS=http://127.0.0.1:5500` (у production вкажіть реальний origin)
 - `LLM_PROVIDER=none|ollama|gemini`
+- `NMAP_ALLOW_SOCKET_FALLBACK=false` (щоб не переключатися на socket fallback)
 
 Рекомендації:
 - Для повністю офлайн-демо використовуйте `LLM_PROVIDER=none`.

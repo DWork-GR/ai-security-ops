@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from app.config import NMAP_ALLOW_SOCKET_FALLBACK
 from app.database.repository import (
     add_scan_finding,
     create_scan_run,
@@ -12,7 +13,7 @@ from app.database.repository import (
     upsert_asset,
     get_latest_scan_run_for_target,
 )
-from app.integrations.nmap.scanner import discover_open_tcp_ports
+from app.integrations.nmap.scanner import discover_open_tcp_ports, inspect_open_tcp_services, is_nmap_available
 from app.services.incident_service import calculate_risk_score, correlate_incident
 
 DEFAULT_TCP_PORTS = [
@@ -155,11 +156,26 @@ def run_active_scan(
     )
 
     started_perf = time.perf_counter()
-    open_ports, discovery_engine = discover_open_tcp_ports(
-        target=target,
-        ports=scan_ports,
-        timeout_ms=timeout_ms,
-    )
+    service_overrides: dict[int, str] = {}
+    script_notes_by_port: dict[int, list[str]] = {}
+
+    if normalized_source in {"nmap", "openvas"} and is_nmap_available():
+        open_ports, service_overrides, script_notes_by_port, discovery_engine = inspect_open_tcp_services(
+            target=target,
+            ports=scan_ports,
+            timeout_ms=timeout_ms,
+            include_vuln_scripts=normalized_source == "openvas",
+        )
+    else:
+        if normalized_source in {"nmap", "openvas"} and not NMAP_ALLOW_SOCKET_FALLBACK:
+            raise RuntimeError(
+                "Real scanning is enforced, but 'nmap' is not available. Install nmap or set NMAP_ALLOW_SOCKET_FALLBACK=true."
+            )
+        open_ports, discovery_engine = discover_open_tcp_ports(
+            target=target,
+            ports=scan_ports,
+            timeout_ms=timeout_ms,
+        )
     duration_ms = int((time.perf_counter() - started_perf) * 1000)
     finished_at = _utc_now_naive()
 
@@ -190,13 +206,22 @@ def run_active_scan(
     incidents_updated = 0
 
     for port in open_ports:
-        service = PORT_TO_SERVICE.get(port, "unknown")
+        service = service_overrides.get(port) or PORT_TO_SERVICE.get(port, "unknown")
         cves = _match_cves_for_service(db, service=service)
         cve_refs = [item.cve_id for item in cves]
         severity = _resolve_severity(cves)
         max_cvss = max((item.cvss for item in cves), default=0.0)
         base_risk = calculate_risk_score(severity=severity, source=normalized_source, status="new")
         risk = _apply_asset_criticality_bonus(base_risk, asset.criticality)
+        script_notes = script_notes_by_port.get(port, [])
+        detail_suffix_en = ""
+        detail_suffix_uk = ""
+        if script_notes:
+            notes = " | ".join(script_notes[:2])
+            detail_suffix_en = f" Evidence: {notes}."
+            detail_suffix_uk = f" Доказ: {notes}."
+        summary_en = f"Potential exposure on {target}:{port}/tcp ({service}).{detail_suffix_en}"
+        summary_uk = f"Ймовірна вразливість на {target}:{port}/tcp ({service}).{detail_suffix_uk}"
 
         finding = {
             "port": port,
@@ -206,8 +231,8 @@ def run_active_scan(
             "risk_score": risk,
             "cvss_max": float(max_cvss),
             "cve_references": cve_refs,
-            "summary_en": f"Potential exposure on {target}:{port}/tcp ({service}).",
-            "summary_uk": f"Ймовірна вразливість на {target}:{port}/tcp ({service}).",
+            "summary_en": summary_en,
+            "summary_uk": summary_uk,
         }
         findings.append(finding)
 
@@ -221,8 +246,8 @@ def run_active_scan(
             risk_score=risk,
             cvss_max=float(max_cvss),
             cve_refs=cve_refs,
-            summary_en=finding["summary_en"],
-            summary_uk=finding["summary_uk"],
+            summary_en=summary_en,
+            summary_uk=summary_uk,
             fingerprint=f"{target}:{port}/tcp:{service}",
         )
 

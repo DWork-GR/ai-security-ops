@@ -76,3 +76,4 @@ GITHUB_ISSUE_LABELS = os.getenv("GITHUB_ISSUE_LABELS", "ai-security-ops,incident
 
 SCAN_WORKER_ENABLED = os.getenv("SCAN_WORKER_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
 SCAN_WORKER_POLL_INTERVAL_SEC = float(os.getenv("SCAN_WORKER_POLL_INTERVAL_SEC", "1.5"))
+NMAP_ALLOW_SOCKET_FALLBACK = _env_bool("NMAP_ALLOW_SOCKET_FALLBACK", False)

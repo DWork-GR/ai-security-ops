@@ -21,6 +21,7 @@ os.environ["INTEGRATION_AUTH_REQUIRED"] = "false"
 os.environ["CHAT_AUTH_REQUIRED"] = "false"
 os.environ["STREAM_ALLOW_QUERY_USER_KEY"] = "true"
 os.environ["SCAN_WORKER_ENABLED"] = "false"
+os.environ["NMAP_ALLOW_SOCKET_FALLBACK"] = "true"
 
 from app.database.db import Base, engine  # noqa: E402
 from app.database.seed_cves import seed as seed_cves  # noqa: E402
