@@ -1,0 +1,39 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - .env
+    environment:
+      CORS_ORIGINS: http://127.0.0.1:8080,http://localhost:8080
+      OLLAMA_BASE_URL: http://ollama:11434
+      DATABASE_URL: ${DATABASE_URL:-sqlite:///./backend/app/database/knowledge.db}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app/database:/app/backend/app/database
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
