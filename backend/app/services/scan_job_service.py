@@ -11,7 +11,7 @@ from app.database.repository import (
     mark_scan_job_failed,
     mark_scan_job_running,
 )
-from app.integrations.openvas.validator import is_valid_ip
+from app.integrations.openvas.validator import ensure_allowed_scan_target
 from app.services.error_service import record_exception
 from app.services.scan_service import run_active_scan
 
@@ -25,11 +25,10 @@ def enqueue_scan_job(
     scan_type: str,
     requested_by: str | None = None,
 ):
-    if not is_valid_ip(target_ip):
-        raise ValueError("Invalid target IP address")
+    normalized_target = ensure_allowed_scan_target(target_ip)
     return create_scan_job(
         db,
-        target_ip=target_ip,
+        target_ip=normalized_target,
         scan_type=scan_type,
         requested_by=requested_by,
     )

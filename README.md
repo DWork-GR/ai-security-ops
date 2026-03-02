@@ -78,10 +78,13 @@ python -m pytest -q
 - `CORS_ORIGINS=http://127.0.0.1:5500` (у production вкажіть реальний origin)
 - `LLM_PROVIDER=none|ollama|gemini`
 - `NMAP_ALLOW_SOCKET_FALLBACK=false` (щоб не переключатися на socket fallback)
+- `NVD_IMPORT_DIR=./backend/app/database/imports`
+- `NVD_IMPORT_MAX_MB=15`
 
 Рекомендації:
 - Для повністю офлайн-демо використовуйте `LLM_PROVIDER=none`.
 - Для локальної безкоштовної LLM-інтеграції використовуйте `ollama`.
+- Для `POST /knowledge/cves/import/nvd` кладіть JSON лише в `NVD_IMPORT_DIR`.
 
 ## Автентифікація та авторизація
 

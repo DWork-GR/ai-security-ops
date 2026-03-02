@@ -1,3 +1,6 @@
+import json
+
+
 def test_openvas_scan_creates_incident(client):
     response = client.post("/integrations/openvas/scan", json={"target": "10.0.0.5"})
     assert response.status_code == 200
@@ -38,6 +41,44 @@ def test_snort_ingestion_deduplicates_by_source_and_message(client):
     assert second_payload["accepted"] == 1
     assert second_payload["incidents_created"] == 0
     assert second_payload["incidents_updated"] == 1
+
+
+def test_snort_distinct_messages_on_same_asset_create_separate_incidents(client):
+    first = client.post(
+        "/integrations/snort/alerts",
+        json={
+            "alerts": [
+                {
+                    "message": "[**] SQL Injection Attempt [**]",
+                    "priority": 1,
+                    "dst_ip": "10.0.0.5",
+                }
+            ]
+        },
+    )
+    assert first.status_code == 200
+    assert first.json()["incidents_created"] == 1
+
+    second = client.post(
+        "/integrations/snort/alerts",
+        json={
+            "alerts": [
+                {
+                    "message": "[**] Suspicious RDP Login Pattern [**]",
+                    "priority": 1,
+                    "dst_ip": "10.0.0.5",
+                }
+            ]
+        },
+    )
+    assert second.status_code == 200
+    assert second.json()["incidents_created"] == 1
+    assert second.json()["incidents_updated"] == 0
+
+    incidents_response = client.get("/incidents")
+    assert incidents_response.status_code == 200
+    items = incidents_response.json()["items"]
+    assert len(items) == 2
 
 
 def test_chat_cve_lookup_and_critical_list(client):
@@ -234,6 +275,15 @@ def test_openvas_active_scan_returns_structured_findings(client):
     assert "incidents_updated" in payload
 
 
+def test_active_scan_blocks_public_target_by_default(client):
+    response = client.post(
+        "/integrations/nmap/scan/active",
+        json={"target": "8.8.8.8", "ports": [53], "timeout_ms": 120},
+    )
+    assert response.status_code == 400
+    assert "outside allowed scan scope" in response.json()["detail"]
+
+
 def test_nmap_active_scan_returns_structured_findings(client):
     response = client.post(
         "/integrations/nmap/scan/active",
@@ -329,6 +379,43 @@ def test_knowledge_search_filters_by_cvss_and_query(client):
     assert payload["total"] >= 1
     assert any(item["cve_id"].startswith("CVE-") for item in payload["items"])
     assert all(item["cvss"] >= 9 for item in payload["items"])
+
+
+def test_nvd_import_blocks_file_outside_configured_directory(client, monkeypatch, tmp_path):
+    from app import config
+
+    import_dir = tmp_path / "imports"
+    import_dir.mkdir()
+    monkeypatch.setattr(config, "NVD_IMPORT_DIR", import_dir)
+
+    outside_file = tmp_path / "outside.json"
+    outside_file.write_text(json.dumps({"vulnerabilities": []}), encoding="utf-8")
+
+    response = client.post(
+        "/knowledge/cves/import/nvd",
+        json={"file_path": str(outside_file)},
+    )
+    assert response.status_code == 400
+    assert "configured import directory" in response.json()["detail"]
+
+
+def test_nvd_import_rejects_oversized_file(client, monkeypatch, tmp_path):
+    from app import config
+
+    import_dir = tmp_path / "imports"
+    import_dir.mkdir()
+    monkeypatch.setattr(config, "NVD_IMPORT_DIR", import_dir)
+    monkeypatch.setattr(config, "NVD_IMPORT_MAX_BYTES", 32)
+
+    large_file = import_dir / "nvd-large.json"
+    large_file.write_text(" " * 64, encoding="utf-8")
+
+    response = client.post(
+        "/knowledge/cves/import/nvd",
+        json={"file_path": large_file.name},
+    )
+    assert response.status_code == 400
+    assert "maximum allowed size" in response.json()["detail"]
 
 
 def test_error_event_is_recorded_and_searchable(client, monkeypatch):

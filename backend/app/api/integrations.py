@@ -13,7 +13,7 @@ from app.core.schemas import (
 )
 from app.database.db import get_db
 from app.integrations.openvas.tasks import start_scan
-from app.integrations.openvas.validator import is_valid_ip
+from app.integrations.openvas.validator import ensure_allowed_scan_target
 from app.services.error_service import record_exception
 from app.services.incident_service import correlate_incident
 from app.services.scan_service import run_active_scan
@@ -37,16 +37,18 @@ def _priority_to_severity(priority: int) -> str:
 
 @router.post("/openvas/scan", response_model=OpenVASScanResponse)
 def openvas_scan(payload: OpenVASScanRequest, db: Session = Depends(get_db)):
-    if not is_valid_ip(payload.target):
-        raise HTTPException(status_code=400, detail="Invalid target IP address")
     try:
-        task = start_scan(payload.target)
+        target = ensure_allowed_scan_target(payload.target)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    try:
+        task = start_scan(target)
         correlate_incident(
             db,
             source="openvas",
-            message=f"OpenVAS scan started for {payload.target}",
+            message=f"OpenVAS scan started for {target}",
             severity="MEDIUM",
-            asset=payload.target,
+            asset=target,
             signature="openvas_scan_started",
             actor_role="integration",
         )
@@ -58,20 +60,22 @@ def openvas_scan(payload: OpenVASScanRequest, db: Session = Depends(get_db)):
             operation="start_scan",
             exc=exc,
             severity="MEDIUM",
-            context={"target": payload.target},
+            context={"target": target},
         )
         raise HTTPException(status_code=500, detail="Failed to start scan") from exc
 
 
 @router.post("/openvas/scan/active", response_model=OpenVASActiveScanResponse)
 def openvas_active_scan(payload: OpenVASActiveScanRequest, db: Session = Depends(get_db)):
-    if not is_valid_ip(payload.target):
-        raise HTTPException(status_code=400, detail="Invalid target IP address")
+    try:
+        target = ensure_allowed_scan_target(payload.target)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
         result = run_active_scan(
             db,
-            target=payload.target,
+            target=target,
             ports=payload.ports,
             timeout_ms=payload.timeout_ms,
         )
@@ -84,7 +88,7 @@ def openvas_active_scan(payload: OpenVASActiveScanRequest, db: Session = Depends
             operation="active_scan",
             exc=exc,
             severity="HIGH",
-            context={"target": payload.target},
+            context={"target": target},
         )
         raise HTTPException(status_code=500, detail="Active scan execution failed") from exc
 
@@ -93,13 +97,15 @@ def openvas_active_scan(payload: OpenVASActiveScanRequest, db: Session = Depends
 
 @router.post("/nmap/scan/active", response_model=NmapActiveScanResponse)
 def nmap_active_scan(payload: NmapActiveScanRequest, db: Session = Depends(get_db)):
-    if not is_valid_ip(payload.target):
-        raise HTTPException(status_code=400, detail="Invalid target IP address")
+    try:
+        target = ensure_allowed_scan_target(payload.target)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     try:
         result = run_active_scan(
             db,
-            target=payload.target,
+            target=target,
             ports=payload.ports,
             timeout_ms=payload.timeout_ms,
             source="nmap",
@@ -113,7 +119,7 @@ def nmap_active_scan(payload: NmapActiveScanRequest, db: Session = Depends(get_d
             operation="active_scan",
             exc=exc,
             severity="HIGH",
-            context={"target": payload.target},
+            context={"target": target},
         )
         raise HTTPException(status_code=500, detail="Nmap active scan execution failed") from exc
 

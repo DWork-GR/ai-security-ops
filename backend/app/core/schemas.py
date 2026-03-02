@@ -309,7 +309,10 @@ class ScanJobListResponse(BaseModel):
 
 
 class NvdImportRequest(BaseModel):
-    file_path: str = Field(..., description="Path to local NVD JSON file")
+    file_path: str = Field(
+        ...,
+        description="Path to NVD JSON file inside the configured import directory",
+    )
     default_mitigation: str = Field(
         default="Review vendor advisory, apply patches, and validate mitigations.",
         description="Fallback mitigation text when feed has no remediation guidance",

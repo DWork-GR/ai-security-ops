@@ -3,6 +3,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
+from app import config
 from app.database.repository import upsert_cves
 
 
@@ -63,15 +64,43 @@ def _extract_mitigation(cve: dict, default_mitigation: str) -> str:
     return f"{default_mitigation} References: {joined}"
 
 
+def _resolve_import_path(file_path: str) -> Path:
+    import_root = Path(config.NVD_IMPORT_DIR).resolve()
+    candidate = Path(file_path).expanduser()
+    if not candidate.is_absolute():
+        candidate = import_root / candidate
+    path = candidate.resolve()
+
+    try:
+        path.relative_to(import_root)
+    except ValueError as exc:
+        raise ValueError(
+            f"NVD import path must stay inside configured import directory: {import_root}"
+        ) from exc
+
+    if path.suffix.lower() != ".json":
+        raise ValueError("NVD import only accepts .json files")
+
+    if not path.exists() or not path.is_file():
+        raise FileNotFoundError(f"File not found: {path}")
+
+    size_bytes = path.stat().st_size
+    if size_bytes > int(config.NVD_IMPORT_MAX_BYTES):
+        raise ValueError(
+            "NVD import file exceeds maximum allowed size "
+            f"({int(config.NVD_IMPORT_MAX_BYTES)} bytes)"
+        )
+
+    return path
+
+
 def import_nvd_json(
     db: Session,
     *,
     file_path: str,
     default_mitigation: str,
 ):
-    path = Path(file_path).expanduser().resolve()
-    if not path.exists():
-        raise FileNotFoundError(f"File not found: {path}")
+    path = _resolve_import_path(file_path)
 
     payload = json.loads(path.read_text(encoding="utf-8"))
     vulnerabilities = payload.get("vulnerabilities")

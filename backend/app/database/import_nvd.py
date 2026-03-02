@@ -1,12 +1,17 @@
 import argparse
 
+from app import config
 from app.database.db import Base, SessionLocal, engine
 from app.services.nvd_import_service import import_nvd_json
 
 
 def main():
     parser = argparse.ArgumentParser(description="Import CVEs from local NVD JSON file")
-    parser.add_argument("--file", required=True, help="Path to NVD JSON file")
+    parser.add_argument(
+        "--file",
+        required=True,
+        help=f"Path to NVD JSON file inside {config.NVD_IMPORT_DIR}",
+    )
     parser.add_argument(
         "--default-mitigation",
         default="Review vendor advisory, apply patches, and validate mitigations.",

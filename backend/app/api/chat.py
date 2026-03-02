@@ -19,7 +19,7 @@ from app.database.repository import (
     list_incidents,
     search_cves,
 )
-from app.integrations.openvas.validator import is_valid_ip
+from app.integrations.openvas.validator import ensure_allowed_scan_target
 from app.integrations.snort.analyzer import get_critical_alerts
 from app.services.error_service import record_exception
 from app.services.attack_mapping_service import infer_attack_mapping
@@ -393,8 +393,10 @@ def process_message(
             ip_address = entities.get("ip_address")
             if not ip_address:
                 return {"type": "text", "message": "IP address is required: full check <ip>"}
-            if not is_valid_ip(ip_address):
-                return {"type": "text", "message": "Invalid IP address."}
+            try:
+                ip_address = ensure_allowed_scan_target(ip_address)
+            except ValueError as exc:
+                return {"type": "text", "message": str(exc)}
 
             scan_result = run_active_scan(db, target=ip_address)
             incident_stats = get_incident_summary_stats(db)
@@ -415,8 +417,10 @@ def process_message(
             ip_address = entities.get("ip_address")
             if not ip_address:
                 return {"type": "text", "message": "IP address is missing."}
-            if not is_valid_ip(ip_address):
-                return {"type": "text", "message": "Invalid IP address."}
+            try:
+                ip_address = ensure_allowed_scan_target(ip_address)
+            except ValueError as exc:
+                return {"type": "text", "message": str(exc)}
 
             result = run_active_scan(db, target=ip_address)
             return {"type": "text", "message": _format_active_scan_result(result)}

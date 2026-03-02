@@ -133,16 +133,11 @@ def correlate_incident(
 
     existing = None
     for candidate in candidates:
-        candidate_asset = infer_asset_from_text(candidate.message) or ""
         candidate_signature = build_message_signature(candidate.message)
 
         same_signature = candidate_signature == normalized_signature
-        same_asset = bool(normalized_asset) and candidate_asset == normalized_asset
 
         if same_signature:
-            existing = candidate
-            break
-        if same_asset:
             existing = candidate
             break
 

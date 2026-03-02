@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 ROOT_DIR = Path(__file__).resolve().parents[2]
 ENV_FILE = ROOT_DIR / ".env"
 DEFAULT_DB_PATH = ROOT_DIR / "backend" / "app" / "database" / "knowledge.db"
+DEFAULT_NVD_IMPORT_DIR = ROOT_DIR / "backend" / "app" / "database" / "imports"
 
 if ENV_FILE.exists():
     load_dotenv(ENV_FILE)
@@ -44,6 +45,16 @@ def _resolve_database_url(raw_url: str) -> str:
     return raw_url
 
 
+def _resolve_directory(raw_path: str, default_path: Path) -> Path:
+    if not raw_path:
+        resolved = default_path
+    else:
+        candidate = Path(raw_path).expanduser()
+        resolved = candidate if candidate.is_absolute() else (ROOT_DIR / candidate).resolve()
+    resolved.mkdir(parents=True, exist_ok=True)
+    return resolved
+
+
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 DATABASE_URL = _resolve_database_url(os.getenv("DATABASE_URL", ""))
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://127.0.0.1:5500")
@@ -77,3 +88,7 @@ GITHUB_ISSUE_LABELS = os.getenv("GITHUB_ISSUE_LABELS", "ai-security-ops,incident
 SCAN_WORKER_ENABLED = os.getenv("SCAN_WORKER_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
 SCAN_WORKER_POLL_INTERVAL_SEC = float(os.getenv("SCAN_WORKER_POLL_INTERVAL_SEC", "1.5"))
 NMAP_ALLOW_SOCKET_FALLBACK = _env_bool("NMAP_ALLOW_SOCKET_FALLBACK", False)
+SCAN_ALLOW_PUBLIC_TARGETS = _env_bool("SCAN_ALLOW_PUBLIC_TARGETS", False)
+SCAN_TARGET_ALLOWLIST = os.getenv("SCAN_TARGET_ALLOWLIST", "").strip()
+NVD_IMPORT_DIR = _resolve_directory(os.getenv("NVD_IMPORT_DIR", "").strip(), DEFAULT_NVD_IMPORT_DIR)
+NVD_IMPORT_MAX_BYTES = max(1, int(os.getenv("NVD_IMPORT_MAX_MB", "15"))) * 1024 * 1024
