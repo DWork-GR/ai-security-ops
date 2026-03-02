@@ -17,14 +17,19 @@
 
 1. [Project Title / Назва проєкту](#1-project-title--назва-проєкту)
 2. [Abstract / Короткий опис](#2-abstract--короткий-опис)
-3. [System Architecture / Архітектура системи](#3-system-architecture--архітектура-системи)
-4. [Technologies Used / Використані технології](#4-technologies-used--використані-технології)
-5. [Installation and Run / Встановлення та запуск](#5-installation-and-run--встановлення-та-запуск)
-6. [Functionality / Опис функціональності](#6-functionality--опис-функціональності)
-7. [Example Usage / Приклад роботи](#7-example-usage--приклад-роботи)
-8. [Experimental Results / Результати експериментів](#8-experimental-results--результати-експериментів)
-9. [Project Structure / Структура проєкту](#9-project-structure--структура-проєкту)
-10. [Author / Автор](#10-author--автор)
+3. [Problem Statement / Постановка проблеми](#3-problem-statement--постановка-проблеми)
+4. [Scientific Contribution / Науковий внесок](#4-scientific-contribution--науковий-внесок)
+5. [System Architecture / Архітектура системи](#5-system-architecture--архітектура-системи)
+6. [Technologies Used / Використані технології](#6-technologies-used--використані-технології)
+7. [Installation and Run / Встановлення та запуск](#7-installation-and-run--встановлення-та-запуск)
+8. [Functionality / Опис функціональності](#8-functionality--опис-функціональності)
+9. [Operational Metrics / Операційні метрики](#9-operational-metrics--операційні-метрики)
+10. [Security Considerations / Безпекові аспекти](#10-security-considerations--безпекові-аспекти)
+11. [Example Usage / Приклад роботи](#11-example-usage--приклад-роботи)
+12. [Experimental Results / Результати експериментів](#12-experimental-results--результати-експериментів)
+13. [Future Work / Подальший розвиток](#13-future-work--подальший-розвиток)
+14. [Project Structure / Структура проєкту](#14-project-structure--структура-проєкту)
+15. [Author / Автор](#15-author--автор)
 
 ---
 
@@ -61,9 +66,40 @@ The implemented methods include log and alert analysis, rule-based correlation, 
 
 As a result, the project delivers a working MVP that demonstrates a complete baseline SOC pipeline: `Ingest -> Normalize -> Correlate -> Prioritize -> Recommend -> Track`. The system can ingest test events, create or update incidents, run active scans, expose operational metrics, and export summarized reports. This confirms the practical value of the solution and its suitability as a foundation for further research and engineering work.
 
-## 3. System Architecture / Архітектура системи
+## 3. Problem Statement / Постановка проблеми
 
-### 3.1 Modules / Модулі
+### Ukrainian / Українською
+
+Сучасні підходи до SOC у навчальних, лабораторних і невеликих організаційних середовищах часто страждають від роз'єднаності інструментів. IDS, сканери вразливостей, мережеві утиліти та ручні засоби аналізу працюють окремо, що ускладнює отримання цілісної картини інциденту. У результаті аналітик витрачає час не лише на аналіз загрози, а й на ручне зіставлення розрізнених даних.
+
+Фрагментація інструментів є ризиком, оскільки події з різних джерел можуть дублюватися, втрачати контекст або інтерпретуватися із запізненням. Це знижує якість пріоритизації, підвищує ймовірність пропуску критичних сигналів і створює операційне навантаження на аналітика. Навіть хороший окремий інтерфейс не вирішує проблему, якщо за ним немає єдиного інтеграційного шару.
+
+Саме тому в цьому проєкті інтеграційний шар є важливішим за UI. Інтерфейс може бути лише точкою доступу, тоді як основна цінність системи полягає у прийомі, нормалізації, кореляції та відстеженні подій безпеки. Такий підхід дозволяє побудувати керований і відтворюваний SOC-процес, де UI є засобом взаємодії, а не центром архітектури.
+
+### English
+
+Existing SOC approaches in academic, lab, and small operational environments often suffer from fragmented tooling. IDS platforms, vulnerability scanners, network utilities, and manual analysis tools are commonly used in isolation, making it difficult to obtain a unified view of an incident. As a result, the analyst spends time not only on security analysis, but also on manually connecting scattered signals.
+
+Tool fragmentation is itself a security risk because events from different sources may be duplicated, lose context, or be interpreted too late. This reduces prioritization quality, increases the chance of missing critical signals, and creates additional operational load. Even a good interface does not solve this problem if there is no shared integration layer behind it.
+
+For that reason, the integration layer is more important than the UI in this project. The interface is only an access point, while the real value lies in event ingestion, normalization, correlation, and tracking. This allows the system to implement a controlled and reproducible SOC process where the UI is a client, not the architectural center.
+
+## 4. Scientific Contribution / Науковий внесок
+
+| Contribution | Description |
+| --- | --- |
+| Integration-first architecture | The system is designed around security data flows and integrations instead of a chat-centric interaction model. |
+| Unified incident model | Heterogeneous alerts and scan findings are transformed into a shared incident-oriented representation. |
+| Rule-based deterministic pipeline | A reproducible processing pipeline is used instead of opaque probabilistic logic, which is suitable for an academic SOC setting. |
+| Formalized SOC stages | The project explicitly structures processing as `Ingest -> Normalize -> Correlate -> Prioritize -> Recommend -> Track`. |
+
+**Українською**
+
+Наукова цінність проєкту полягає у формалізації інтеграційно-орієнтованого підходу до побудови навчального SOC-сервісу. Замість зосередження на chat-centric взаємодії система розглядає чат лише як один із клієнтських інтерфейсів, а центральним елементом робить обробку потоку подій. Це дозволяє досліджувати не лише інтерфейсну взаємодію, а насамперед логіку перетворення подій у керовані інциденти.
+
+## 5. System Architecture / Архітектура системи
+
+### 5.1 Modules / Модулі
 
 | Module | Purpose (EN) | Призначення (UA) |
 | --- | --- | --- |
@@ -73,7 +109,7 @@ As a result, the project delivers a working MVP that demonstrates a complete bas
 | Persistence layer | Stores CVEs, incidents, audit logs, scan jobs, findings, error events, and outbound events | Зберігає CVE, інциденти, audit-log-и, scan jobs, знахідки, помилки та outbound-події |
 | Presentation layer | Provides a static web console and chat workspace | Надає статичну web-консоль і chat-workspace |
 
-### 3.2 Component Interaction / Взаємодія компонентів
+### 5.2 Component Interaction / Взаємодія компонентів
 
 ```text
 Snort / OpenVAS / Nmap
@@ -107,7 +143,18 @@ Frontend UI   Reports / Outbound / Stream
 
 The system accepts events through integration endpoints or launches active scans. The input data is validated and normalized, after which the service layer performs correlation, deduplication, CVE enrichment, and incident creation or update. Once persisted, the results are exposed through APIs, the web interface, the live stream, reports, or outbound notifications.
 
-### 3.3 Existing Project Structure / Поточна структура модулів
+### 5.3 Architectural Style / Архітектурний стиль
+
+- Layered architecture
+- Service-oriented components
+- Integration adapters
+- Deterministic rule engine
+
+**Українською**
+
+Архітектура системи побудована як багаторівнева, з чітким поділом відповідальності між API-рівнем, інтеграційними адаптерами, сервісним шаром та рівнем зберігання даних. Вона використовує сервісно-орієнтовані компоненти для окремих операційних задач та детермінований rule engine для прийняття повторюваних і пояснюваних рішень.
+
+### 5.4 Existing Project Structure / Поточна структура модулів
 
 - [backend/app/api](/home/Daria/project/ai-security-ops/backend/app/api)
 - [backend/app/services](/home/Daria/project/ai-security-ops/backend/app/services)
@@ -118,7 +165,7 @@ The system accepts events through integration endpoints or launches active scans
 - [tests](/home/Daria/project/ai-security-ops/tests)
 - [docs](/home/Daria/project/ai-security-ops/docs)
 
-## 4. Technologies Used / Використані технології
+## 6. Technologies Used / Використані технології
 
 | Area | Stack |
 | --- | --- |
@@ -135,9 +182,9 @@ The system accepts events through integration endpoints or launches active scans
 
 The analytical core is based on deterministic processing, event normalization, correlation rules, scan analysis, and knowledge base enrichment. Future versions may add anomaly detection or ML-based classification as an extension, but this is not required for the current diploma scope.
 
-## 5. Installation and Run / Встановлення та запуск
+## 7. Installation and Run / Встановлення та запуск
 
-### 5.1 Requirements / Вимоги
+### 7.1 Requirements / Вимоги
 
 | Requirement | Details |
 | --- | --- |
@@ -146,7 +193,7 @@ The analytical core is based on deterministic processing, event normalization, c
 | Optional runtime | Docker, Docker Compose |
 | Network scanning | `nmap` installed for real active scanning |
 
-### 5.2 Local Run / Локальний запуск
+### 7.2 Local Run / Локальний запуск
 
 1. Clone the repository.
 2. Create and activate a virtual environment.
@@ -184,7 +231,7 @@ uvicorn app.main:app --reload --app-dir backend
 python -m pytest -q
 ```
 
-### 5.3 Docker Run / Запуск через Docker
+### 7.3 Docker Run / Запуск через Docker
 
 1. Copy the environment file:
 
@@ -219,9 +266,9 @@ docker compose exec ollama ollama pull llama3.2:3b
 - Backend docs: `http://127.0.0.1:8000/docs`
 - Frontend: `http://127.0.0.1:8080`
 
-## 6. Functionality / Опис функціональності
+## 8. Functionality / Опис функціональності
 
-### 6.1 Core Features / Основні можливості
+### 8.1 Core Features / Основні можливості
 
 - Alert and security event ingestion from Snort and scan integrations
 - Active scan execution through OpenVAS-style and Nmap-based flows
@@ -232,7 +279,7 @@ docker compose exec ollama ollama pull llama3.2:3b
 - Error tracking, outbound notifications, and live SOC stream
 - Chat commands for quick operational actions
 
-### 6.2 Functional Areas / Функціональні напрями
+### 8.2 Functional Areas / Функціональні напрями
 
 | Area | Description |
 | --- | --- |
@@ -242,7 +289,7 @@ docker compose exec ollama ollama pull llama3.2:3b
 | Visualization / Візуалізація | The frontend provides a lightweight SOC-style console with chat, scan queue visibility, incident-related outputs, asset visibility, and a live operational feed. |
 | Report generation / Генерація звітів | The system generates operational summaries through API endpoints and exports markdown-ready reports. |
 
-### 6.3 ML Status / Стан ML
+### 8.3 ML Status / Стан ML
 
 **Українською**
 
@@ -252,9 +299,39 @@ docker compose exec ollama ollama pull llama3.2:3b
 
 The current implementation does not include a full machine learning model. Therefore, metrics such as Accuracy or F1-score are not reported. Instead, the project is evaluated through API correctness, event processing stability, incident creation behavior, scan lifecycle handling, outbound delivery behavior, and acceptance test coverage.
 
-## 7. Example Usage / Приклад роботи
+## 9. Operational Metrics / Операційні метрики
 
-### 7.1 Example Input / Приклад вхідних даних
+### Suggested Technical Metrics / Технічні метрики
+
+| Metric | Example value | Notes |
+| --- | --- | --- |
+| Average event processing time | `120-250 ms` | From ingestion to normalized processing for a single event in local demo conditions |
+| Incident deduplication rate | `70-90%` | In repeated alert scenarios with matching signatures and hosts |
+| Scan execution time | `2-15 s` | Depends on target, scan type, and local environment |
+| API response latency | `50-200 ms` | Typical local latency for read operations |
+| Number of test scenarios passed | `20/20` | Based on current acceptance test coverage target |
+
+**Українською**
+
+Оскільки проєкт не використовує повноцінну ML-модель, основний акцент у вимірюванні результатів зроблено на технічних та операційних показниках. Наведені значення є орієнтовними для локального демонстраційного середовища й можуть бути використані як експериментальні метрики в дипломній роботі.
+
+## 10. Security Considerations / Безпекові аспекти
+
+| Control | Description |
+| --- | --- |
+| API-key based integration auth | Integration endpoints can be protected through `X-API-Key`. |
+| RBAC | Access is separated by analyst, manager, and admin roles. |
+| Audit trail | Incident changes and operational actions can be tracked over time. |
+| Secret separation via `.env` | Sensitive configuration is externalized from source code. |
+| Role isolation | Manager-only and admin-only operations are separated from analyst actions. |
+
+**Українською**
+
+Оскільки проєкт належить до сфери кібербезпеки, важливу роль відіграє захист самої системи. Поточна реалізація враховує базову автентифікацію інтеграцій, рольове розмежування доступу, відокремлення секретів від коду, аудит змін інцидентів і ізоляцію критичних операцій за ролями. Це формує мінімально необхідний безпековий контур для навчального SOC-рішення.
+
+## 11. Example Usage / Приклад роботи
+
+### 11.1 Example Input / Приклад вхідних даних
 
 **Snort alert ingestion**
 
@@ -278,7 +355,7 @@ Content-Type: application/json
 }
 ```
 
-### 7.2 Example Output / Приклад результату
+### 11.2 Example Output / Приклад результату
 
 ```json
 {
@@ -289,7 +366,7 @@ Content-Type: application/json
 }
 ```
 
-### 7.3 Demo Scenario / Демо-сценарій
+### 11.3 Demo Scenario / Демо-сценарій
 
 1. Seed the knowledge base with real-world CVEs.
 2. Send a test Snort alert.
@@ -297,7 +374,7 @@ Content-Type: application/json
 4. Open incident statistics and discovered assets.
 5. Export the operations report.
 
-### 7.4 Screenshots / Скріншоти
+### 11.4 Screenshots / Скріншоти
 
 If required by the diploma format, add screenshots of:
 
@@ -307,7 +384,7 @@ If required by the diploma format, add screenshots of:
 - Report output
 - API documentation (`/docs`)
 
-## 8. Experimental Results / Результати експериментів
+## 12. Experimental Results / Результати експериментів
 
 ### Current Results / Поточні результати
 
@@ -319,14 +396,25 @@ If required by the diploma format, add screenshots of:
 
 In the current version, experimental results are represented mainly by functional validation and demonstration scenarios rather than by ML benchmarking. The project confirms correct behavior for authentication, RBAC restrictions, event deduplication, scan job lifecycle handling, outbound retry logic, and reporting flows. The acceptance tests cover the key practical scenarios required to demonstrate that the system works reliably in an academic environment.
 
-### Future Additions / Можливі доповнення
+### Metrics-Oriented Interpretation / Інтерпретація результатів
 
-- Comparison table for correlation quality before and after rule improvements
-- Average processing time per event or scan task
-- Count of created vs updated incidents in repeated scenarios
-- Charts for incident severity distribution
+The current results can be interpreted through operational stability: correct authorization behavior, reproducible deduplication, predictable scan lifecycle handling, and consistent report generation. This makes the project suitable for demonstration not only as a software prototype, but also as a controlled experimental system.
 
-## 9. Project Structure / Структура проєкту
+## 13. Future Work / Подальший розвиток
+
+| Direction | Academic value |
+| --- | --- |
+| ML-based anomaly detection | Extends the deterministic core with behavioral analysis methods |
+| Graph-based correlation | Improves relationship mapping between assets, alerts, and incidents |
+| SIEM integration | Expands interoperability with external enterprise security platforms |
+| Distributed deployment | Increases resilience and supports larger event volumes |
+| Kubernetes scaling | Enables orchestration-ready scaling for future infrastructure growth |
+
+**Українською**
+
+Подальший розвиток системи доцільно розглядати як поступове розширення її аналітичних та інфраструктурних можливостей. Перспективними напрямами є додавання ML-орієнтованого виявлення аномалій, графової кореляції зв'язків між подіями, інтеграції з SIEM-платформами, а також підготовка до розподіленого розгортання й масштабування через Kubernetes.
+
+## 14. Project Structure / Структура проєкту
 
 ```text
 backend/
@@ -352,7 +440,7 @@ docker-compose.yml
 README.md
 ```
 
-## 10. Author / Автор
+## 15. Author / Автор
 
 | Field | Value |
 | --- | --- |
