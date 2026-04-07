@@ -210,16 +210,13 @@ function connectSocStream() {
     socStream = null;
   }
 
+  const query = new URLSearchParams({ limit: "8", interval_sec: "3" });
   const userKey = getUserKey();
   if (userKey) {
-    // Browser EventSource cannot set custom auth headers.
-    // To avoid leaking keys in URL query, switch to authenticated polling endpoints.
-    setSocStatus("degraded", t("status_fallback"));
-    ensurePollingFallbacks();
-    return;
+    // EventSource cannot send custom headers, so authenticated live mode uses
+    // the optional query-key backend path when it is enabled on the server.
+    query.set("user_key", userKey);
   }
-
-  const query = new URLSearchParams({ limit: "8", interval_sec: "3" });
 
   const streamUrl = `${getApiBase()}/stream/soc-live?${query.toString()}`;
   setSocStatus("connecting", t("status_connecting"));
