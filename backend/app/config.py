@@ -88,6 +88,15 @@ GITHUB_ISSUE_LABELS = os.getenv("GITHUB_ISSUE_LABELS", "ai-security-ops,incident
 SCAN_WORKER_ENABLED = os.getenv("SCAN_WORKER_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
 SCAN_WORKER_POLL_INTERVAL_SEC = float(os.getenv("SCAN_WORKER_POLL_INTERVAL_SEC", "1.5"))
 NMAP_ALLOW_SOCKET_FALLBACK = _env_bool("NMAP_ALLOW_SOCKET_FALLBACK", False)
+NMAP_BINARY = os.getenv("NMAP_BINARY", "nmap").strip() or "nmap"
+NMAP_SCAN_TYPE = os.getenv("NMAP_SCAN_TYPE", "-sT").strip()
+SNORT_ALERT_FILE = os.getenv(
+    "SNORT_ALERT_FILE",
+    str(ROOT_DIR / "backend" / "app" / "integrations" / "snort" / "alerts" / "alert.fast"),
+).strip()
+SNORT_BINARY = os.getenv("SNORT_BINARY", "snort").strip() or "snort"
+SNORT_CONFIG = os.getenv("SNORT_CONFIG", r"C:\Snort\etc\snort.conf").strip()
+SNORT_INTERFACE = os.getenv("SNORT_INTERFACE", "1").strip() or "1"
 SCAN_ALLOW_PUBLIC_TARGETS = _env_bool("SCAN_ALLOW_PUBLIC_TARGETS", False)
 SCAN_TARGET_ALLOWLIST = os.getenv("SCAN_TARGET_ALLOWLIST", "").strip()
 NVD_IMPORT_DIR = _resolve_directory(os.getenv("NVD_IMPORT_DIR", "").strip(), DEFAULT_NVD_IMPORT_DIR)

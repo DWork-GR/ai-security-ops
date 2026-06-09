@@ -231,6 +231,69 @@ uvicorn app.main:app --reload --app-dir backend
 python -m pytest -q
 ```
 
+### 7.2.1 Native Windows Integrations
+
+For real scanning on Windows, install Nmap and make sure the backend can find it:
+
+```powershell
+nmap --version
+where.exe nmap
+```
+
+If `nmap` is installed but not in `PATH`, set the full binary path in `.env`:
+
+```env
+NMAP_BINARY=C:\Program Files (x86)\Nmap\nmap.exe
+NMAP_ALLOW_SOCKET_FALLBACK=false
+NMAP_SCAN_TYPE=-sT
+```
+
+To forward real Snort `alert_fast` output into the backend:
+
+```powershell
+python tools\snort_bridge.py
+```
+
+The bridge reads `SNORT_ALERT_FILE` and `INTEGRATION_API_KEY` from `.env`. To generate a local test alert:
+
+```powershell
+python tools\write_snort_test_alert.py
+```
+
+To check the local Snort installation:
+
+```powershell
+python tools\snort_check.py
+```
+
+To run Snort with the configured interface and `alert_fast` output:
+
+```powershell
+python tools\snort_run.py
+```
+
+OpenVAS/Greenbone reports can be imported through:
+
+```text
+POST /integrations/openvas/report
+```
+
+The endpoint accepts either exported Greenbone XML in `report_xml` or normalized JSON findings in `findings`.
+
+To check local Ollama status:
+
+```powershell
+python tools\ollama_check.py
+```
+
+After installing Ollama and pulling a model, enable local LLM analysis:
+
+```env
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=llama3.2:3b
+```
+
 ### 7.3 Docker Run / Запуск через Docker
 
 1. Copy the environment file:

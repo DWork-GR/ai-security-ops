@@ -7,11 +7,14 @@ from app.core.schemas import (
     NmapActiveScanResponse,
     OpenVASActiveScanRequest,
     OpenVASActiveScanResponse,
+    OpenVASReportImportRequest,
+    OpenVASReportImportResponse,
     OpenVASScanRequest,
     OpenVASScanResponse,
     SnortAlertsIn,
 )
 from app.database.db import get_db
+from app.integrations.openvas.report_importer import import_openvas_findings, parse_greenbone_report_xml
 from app.integrations.openvas.tasks import start_scan
 from app.integrations.openvas.validator import ensure_allowed_scan_target
 from app.services.error_service import record_exception
@@ -93,6 +96,40 @@ def openvas_active_scan(payload: OpenVASActiveScanRequest, db: Session = Depends
         raise HTTPException(status_code=500, detail="Active scan execution failed") from exc
 
     return OpenVASActiveScanResponse(**result)
+
+
+@router.post("/openvas/report", response_model=OpenVASReportImportResponse)
+def openvas_report_import(payload: OpenVASReportImportRequest, db: Session = Depends(get_db)):
+    target = (payload.target or "").strip() or None
+    if target:
+        try:
+            target = ensure_allowed_scan_target(target)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        if payload.report_xml:
+            findings = parse_greenbone_report_xml(payload.report_xml, default_target=target)
+        else:
+            findings = [item.model_dump() for item in (payload.findings or [])]
+
+        if not findings:
+            raise ValueError("No OpenVAS findings were found in the request")
+
+        result = import_openvas_findings(db, target=target, findings=findings)
+        return OpenVASReportImportResponse(**result)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        record_exception(
+            db,
+            source="openvas",
+            operation="report_import",
+            exc=exc,
+            severity="HIGH",
+            context={"target": target},
+        )
+        raise HTTPException(status_code=500, detail="OpenVAS report import failed") from exc
 
 
 @router.post("/nmap/scan/active", response_model=NmapActiveScanResponse)

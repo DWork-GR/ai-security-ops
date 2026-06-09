@@ -16,6 +16,44 @@ def test_openvas_scan_creates_incident(client):
     assert incidents[0]["source"] == "openvas"
 
 
+def test_openvas_report_import_creates_findings_and_incidents(client):
+    report_xml = """
+    <report>
+      <results>
+        <result>
+          <host>10.0.0.5</host>
+          <port>443/tcp</port>
+          <threat>High</threat>
+          <severity>7.5</severity>
+          <name>TLS service uses weak cipher suite</name>
+          <description>Remote TLS service accepts weak cryptography.</description>
+          <nvt>
+            <name>TLS service uses weak cipher suite</name>
+            <family>SSL and TLS</family>
+            <cvss_base>7.5</cvss_base>
+            <cve>CVE-2016-2183</cve>
+          </nvt>
+        </result>
+      </results>
+    </report>
+    """
+
+    response = client.post(
+        "/integrations/openvas/report",
+        json={"target": "10.0.0.5", "report_xml": report_xml},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["accepted"] == 1
+    assert payload["incidents_created"] == 1
+    assert payload["scan_task_id"]
+
+    incidents_response = client.get("/incidents", params={"source": "openvas"})
+    assert incidents_response.status_code == 200
+    incidents = incidents_response.json()["items"]
+    assert any("TLS service uses weak cipher suite" in item["message"] for item in incidents)
+
+
 def test_snort_ingestion_deduplicates_by_source_and_message(client):
     body = {
         "alerts": [
@@ -41,6 +79,24 @@ def test_snort_ingestion_deduplicates_by_source_and_message(client):
     assert second_payload["accepted"] == 1
     assert second_payload["incidents_created"] == 0
     assert second_payload["incidents_updated"] == 1
+
+
+def test_snort_parser_accepts_one_line_fast_alerts():
+    from app.integrations.snort.parser import parse_alert_text
+
+    raw = (
+        "05/20-03:10:00.123 [**] [1:1000001:1] AI Security Ops test Snort alert [**] "
+        "[Priority: 1] {TCP} 192.168.56.10:4444 -> 127.0.0.1:80\n"
+        "05/20-03:10:01.456 [**] [1:1000002:1] Suspicious RDP Login Pattern [**] "
+        "[Priority: 2] {TCP} 192.168.56.11:5555 -> 10.0.0.5:3389\n"
+    )
+
+    alerts = parse_alert_text(raw)
+    assert len(alerts) == 2
+    assert alerts[0]["message"] == "AI Security Ops test Snort alert"
+    assert alerts[0]["priority"] == 1
+    assert alerts[0]["src_ip"] == "192.168.56.10"
+    assert alerts[0]["dst_ip"] == "127.0.0.1"
 
 
 def test_snort_distinct_messages_on_same_asset_create_separate_incidents(client):

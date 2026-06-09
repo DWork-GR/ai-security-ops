@@ -574,6 +574,16 @@ def list_scan_findings_by_run(db: Session, scan_run_id: str):
     )
 
 
+def list_latest_scan_findings(db: Session, limit: int = 25):
+    return (
+        db.query(ScanFinding, ScanRun)
+        .join(ScanRun, ScanFinding.scan_run_id == ScanRun.id)
+        .order_by(ScanRun.finished_at.desc(), ScanFinding.risk_score.desc())
+        .limit(limit)
+        .all()
+    )
+
+
 def get_latest_scan_run_for_target(db: Session, target_ip: str):
     return (
         db.query(ScanRun)

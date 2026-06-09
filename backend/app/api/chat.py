@@ -15,8 +15,10 @@ from app.database.repository import (
     get_error_summary_stats,
     get_incident_summary_stats,
     get_platform_overview_stats,
+    list_latest_scan_findings,
     list_error_events,
     list_incidents,
+    list_scan_runs,
     search_cves,
 )
 from app.integrations.openvas.validator import ensure_allowed_scan_target
@@ -325,6 +327,131 @@ def _format_full_check_summary(
     return "\n".join(lines)
 
 
+def _build_soc_evidence(db: Session) -> list[str]:
+    evidence: list[str] = []
+
+    stats = get_incident_summary_stats(db)
+    evidence.append(
+        "SOC_STATS "
+        f"total_incidents={stats['total_incidents']} "
+        f"open_incidents={stats['open_incidents']} "
+        f"critical_open_incidents={stats['critical_open_incidents']} "
+        f"by_source={stats['by_source']} "
+        f"by_severity={stats['by_severity']}"
+    )
+
+    for incident in list_incidents(db, limit=10):
+        attack = infer_attack_mapping(source=incident.source, message=incident.message)
+        evidence.append(
+            "INCIDENT "
+            f"id={incident.id} source={incident.source} severity={incident.severity} "
+            f"status={incident.status} asset={getattr(incident, 'asset', None) or 'n/a'} "
+            f"attack={attack['attack_technique_id'] or 'n/a'} "
+            f"message={incident.message}"
+        )
+
+    for scan_run in list_scan_runs(db, limit=5):
+        evidence.append(
+            "SCAN_RUN "
+            f"task_id={scan_run.task_id} target={scan_run.target_ip} "
+            f"profile={scan_run.scan_profile} status={scan_run.status} "
+            f"scanned_ports={scan_run.scanned_ports} open_ports={scan_run.open_ports_count} "
+            f"duration_ms={scan_run.duration_ms} finished_at={scan_run.finished_at.isoformat()}"
+        )
+
+    for finding, scan_run in list_latest_scan_findings(db, limit=20):
+        evidence.append(
+            "SCAN_FINDING "
+            f"source_profile={scan_run.scan_profile} target={scan_run.target_ip} "
+            f"port={finding.port}/{finding.protocol} service={finding.service} "
+            f"severity={finding.severity} risk={finding.risk_score} cvss={finding.cvss_max} "
+            f"cves={finding.cve_refs or 'n/a'} summary={finding.summary_en}"
+        )
+
+    for alert in get_critical_alerts()[:10]:
+        evidence.append(
+            "SNORT_ALERT "
+            f"priority={alert['priority']} src={alert.get('src_ip') or 'n/a'} "
+            f"dst={alert.get('dst_ip') or 'n/a'} message={alert['message']}"
+        )
+
+    for error_item in list_error_events(db, limit=5):
+        evidence.append(
+            "INTEGRATION_ERROR "
+            f"source={error_item.source} operation={error_item.operation} "
+            f"severity={error_item.severity} occurrences={error_item.occurrences} "
+            f"message={error_item.message}"
+        )
+
+    return evidence
+
+
+def _format_rule_based_soc_assessment(evidence: list[str]) -> str:
+    if not evidence:
+        return (
+            "[EN] Rule-Based SOC Assessment\n"
+            "Executive Summary:\n"
+            "- No scanner, incident, or IDS evidence is available yet.\n"
+            "Next Actions:\n"
+            "- Run Nmap/OpenVAS scans or forward Snort alerts, then repeat analysis.\n\n"
+            "[UK] Rule-Based SOC Оцінка\n"
+            "Короткий Висновок:\n"
+            "- Даних від сканерів, інцидентів або IDS ще немає.\n"
+            "Наступні Дії:\n"
+            "- Запустіть Nmap/OpenVAS або передайте Snort alerts, потім повторіть аналіз."
+        )
+
+    scan_findings = [item for item in evidence if item.startswith("SCAN_FINDING")]
+    snort_alerts = [item for item in evidence if item.startswith("SNORT_ALERT")]
+    incidents = [item for item in evidence if item.startswith("INCIDENT")]
+    errors = [item for item in evidence if item.startswith("INTEGRATION_ERROR")]
+    critical_or_high = [
+        item for item in scan_findings + incidents + snort_alerts
+        if "severity=CRITICAL" in item or "severity=HIGH" in item or "priority=1" in item
+    ]
+
+    lines = [
+        "[EN] Rule-Based SOC Assessment",
+        "Executive Summary:",
+        f"- Evidence items reviewed: {len(evidence)}.",
+        f"- Scanner findings: {len(scan_findings)}, IDS critical alerts: {len(snort_alerts)}, incidents: {len(incidents)}.",
+        f"- High-priority signals: {len(critical_or_high)}.",
+        "",
+        "What This Means:",
+    ]
+    if scan_findings:
+        lines.append("- Exposed services from Nmap/OpenVAS are present and should be validated against asset purpose.")
+    if snort_alerts:
+        lines.append("- Snort has produced priority-1 alerts, so traffic evidence should be correlated with exposed services.")
+    if incidents:
+        lines.append("- Incidents already exist in the SOC queue; prioritize open HIGH/CRITICAL items first.")
+    if errors:
+        lines.append("- Integration errors exist; verify scanner/IDS reliability before relying on absence of alerts.")
+    if not any([scan_findings, snort_alerts, incidents]):
+        lines.append("- There is not enough operational evidence yet for a confident threat assessment.")
+
+    lines.extend(["", "Recommended Analyst Actions:"])
+    lines.append("- Confirm whether each exposed port is expected for the asset owner and environment.")
+    lines.append("- For HIGH/CRITICAL findings, collect service banners, patch state, and recent authentication logs.")
+    lines.append("- Correlate Snort source/destination IPs with scan targets and incident timestamps.")
+    lines.append("- Close or firewall unused services, then rescan to validate the fix.")
+
+    lines.extend([
+        "",
+        "[UK] Rule-Based SOC Оцінка",
+        "Короткий Висновок:",
+        f"- Переглянуто доказів: {len(evidence)}.",
+        f"- Знахідки сканерів: {len(scan_findings)}, критичні IDS alerts: {len(snort_alerts)}, інциденти: {len(incidents)}.",
+        "Дії Аналітика:",
+        "- Перевірити, чи кожен відкритий порт очікуваний для цього активу.",
+        "- Для HIGH/CRITICAL зібрати банери сервісів, стан патчів і логи автентифікації.",
+        "- Зіставити Snort IP з цілями сканування та часом інцидентів.",
+        "- Закрити або обмежити непотрібні сервіси і повторити сканування.",
+    ])
+
+    return "\n".join(lines)
+
+
 @router.post("/chat")
 def process_message(
     request: ChatRequest,
@@ -443,9 +570,6 @@ def process_message(
 
         if intent == "analyze_threats":
             alerts = get_critical_alerts()
-            if not alerts:
-                return {"type": "text", "message": "No critical Snort alerts found."}
-
             alert_messages = [alert["message"] for alert in alerts]
             created_count = 0
             updated_count = 0
@@ -463,15 +587,25 @@ def process_message(
                 else:
                     updated_count += 1
 
-            analysis = analyze_alerts_expert(alert_messages)
-            llm_analysis = analyze_security_incidents(alert_messages)
+            evidence = _build_soc_evidence(db)
+            if not evidence:
+                evidence = ["NO_EVIDENCE No scanner findings, incidents, Snort alerts, or integration errors were found."]
+
+            snort_analysis = analyze_alerts_expert(alert_messages)
+            rule_analysis = _format_rule_based_soc_assessment(evidence)
+            llm_analysis = analyze_security_incidents(evidence)
             return {
                 "type": "text",
                 "message": (
                     "[Incidents]\n"
                     f"- created: {created_count}\n"
                     f"- updated: {updated_count}\n\n"
-                    f"{analysis}\n\n"
+                    "[Evidence]\n"
+                    f"- items: {len(evidence)}\n"
+                    f"- snort_priority_1_alerts: {len(alert_messages)}\n\n"
+                    f"{rule_analysis}\n\n"
+                    "[Snort Rule Engine]\n"
+                    f"{snort_analysis}\n\n"
                     "[LLM]\n"
                     f"{llm_analysis}"
                 ),

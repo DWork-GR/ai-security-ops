@@ -1,18 +1,20 @@
 from pathlib import Path
 import re
 
-ALERTS_FILE = Path(__file__).parent / "alerts" / "alert.fast"
+from app.config import SNORT_ALERT_FILE
+
+ALERTS_FILE = Path(SNORT_ALERT_FILE)
 MESSAGE_PATTERN = re.compile(r"\[\*\*\]\s*(?:\[\d+:\d+:\d+\]\s*)?(.*?)\s*\[\*\*\]")
 PRIORITY_PATTERN = re.compile(r"\[Priority:\s*(\d+)\]")
-IP_PAIR_PATTERN = re.compile(r"(\d{1,3}(?:\.\d{1,3}){3})\s*->\s*(\d{1,3}(?:\.\d{1,3}){3})")
+IP_PAIR_PATTERN = re.compile(
+    r"(\d{1,3}(?:\.\d{1,3}){3})(?::\d+)?\s*->\s*(\d{1,3}(?:\.\d{1,3}){3})(?::\d+)?"
+)
 
 
-def parse_alerts():
-    if not ALERTS_FILE.exists():
-        return []
-
-    raw = ALERTS_FILE.read_text(encoding="utf-8")
-    blocks = raw.strip().split("\n\n")
+def parse_alert_text(raw: str):
+    blocks = [block.strip() for block in raw.strip().split("\n\n") if block.strip()]
+    if len(blocks) <= 1:
+        blocks = [line.strip() for line in raw.splitlines() if line.strip()]
 
     alerts = []
     for block in blocks:
@@ -39,3 +41,11 @@ def parse_alerts():
         )
 
     return alerts
+
+
+def parse_alerts():
+    if not ALERTS_FILE.exists():
+        return []
+
+    raw = ALERTS_FILE.read_text(encoding="utf-8")
+    return parse_alert_text(raw)

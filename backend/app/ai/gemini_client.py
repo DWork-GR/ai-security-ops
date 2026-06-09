@@ -19,31 +19,44 @@ def _has_real_api_key(value: str) -> bool:
     return True
 
 
-def _build_prompt(alerts: list[str]) -> str:
+def _build_prompt(evidence_items: list[str]) -> str:
+    evidence = "\n".join(evidence_items) if evidence_items else "No evidence was provided."
     return (
-        "You are a cybersecurity analyst (SOC Level 2).\n"
+        "You are a cybersecurity analyst (SOC Level 2/3) assisting a defensive security team.\n"
         "This is a defensive blue-team incident response task.\n"
-        "Provide only detection, containment, and remediation guidance.\n"
-        "Do not provide offensive instructions.\n"
-        "Use only the alerts below. Keep output concise and practical.\n"
-        "Do not include disclaimers about real-time data, model limits, or knowledge cutoff.\n"
+        "Provide only detection, containment, triage, and remediation guidance.\n"
+        "Do not provide offensive exploitation instructions or payloads.\n"
+        "Use only the evidence below. If evidence is incomplete, state what must be verified.\n"
+        "Be concrete: explain what the scanner data means, why it matters, how sources relate, "
+        "and what the analyst should do next.\n"
+        "Do not include disclaimers about real-time data, model limits, or knowledge cutoff.\n\n"
         "Return plain text in this exact structure:\n\n"
-        "[EN] LLM Enrichment\n"
-        "Threat Analysis:\n"
+        "[EN] Analyst Assessment\n"
+        "Executive Summary:\n"
         "- ...\n"
-        "Potential Risks:\n"
+        "Evidence Correlation:\n"
         "- ...\n"
-        "Response Actions:\n"
+        "Risk Reasoning:\n"
+        "- ...\n"
+        "Likely Attack Path:\n"
+        "- ...\n"
+        "Triage Questions:\n"
+        "- ...\n"
+        "Containment and Remediation:\n"
+        "- ...\n"
+        "Validation Steps:\n"
         "- ...\n\n"
-        "[UK] LLM Збагачення\n"
-        "Аналіз Загрози:\n"
+        "[UK] Аналітична Оцінка\n"
+        "Короткий Висновок:\n"
         "- ...\n"
-        "Потенційні Ризики:\n"
+        "Кореляція Доказів:\n"
         "- ...\n"
-        "Дії Реагування:\n"
+        "Обгрунтування Ризику:\n"
+        "- ...\n"
+        "Дії Аналітика:\n"
         "- ...\n\n"
-        "Limit each section to 2-3 bullets.\n\n"
-        f"Alerts:\n{chr(10).join(alerts)}\n"
+        "Prefer specific assets, ports, services, CVEs, incident status, and scanner source names.\n\n"
+        f"Evidence:\n{evidence}\n"
     )
 
 
@@ -89,12 +102,12 @@ def _looks_like_refusal(text: str) -> bool:
     return any(marker in lowered for marker in refusal_markers)
 
 
-def _analyze_with_ollama(alerts: list[str]) -> str:
+def _analyze_with_ollama(evidence_items: list[str]) -> str:
     payload = {
         "model": OLLAMA_MODEL,
-        "prompt": _build_prompt(alerts),
+        "prompt": _build_prompt(evidence_items),
         "stream": False,
-        "options": {"temperature": 0.2, "num_predict": 500},
+        "options": {"temperature": 0.15, "num_predict": 1400},
     }
     req = request.Request(
         f"{OLLAMA_BASE_URL}/api/generate",
@@ -105,25 +118,25 @@ def _analyze_with_ollama(alerts: list[str]) -> str:
     if OLLAMA_API_KEY:
         req.add_header("Authorization", f"Bearer {OLLAMA_API_KEY}")
     try:
-        with request.urlopen(req, timeout=45) as response:
+        with request.urlopen(req, timeout=90) as response:
             body = response.read().decode("utf-8")
         parsed = json.loads(body)
         text = _clean_llm_output(parsed.get("response", "").strip())
         if not text:
             return (
-                "[EN] LLM Enrichment\n"
+                "[EN] Analyst Assessment\n"
                 "- Unavailable: Ollama returned an empty response.\n\n"
-                "[UK] LLM Збагачення\n"
+                "[UK] Аналітична Оцінка\n"
                 "- Недоступно: Ollama повернула порожню відповідь."
             )
         if _looks_like_refusal(text):
             return (
-                "[EN] LLM Enrichment\n"
-                "- Unavailable: model refused this request.\n"
-                "- Rule-based EN+UK analysis is shown above.\n\n"
-                "[UK] LLM Збагачення\n"
-                "- Недоступно: модель відхилила цей запит.\n"
-                "- Вище показано rule-based аналіз EN+UK."
+                "[EN] Analyst Assessment\n"
+                "- Unavailable: model refused this defensive analysis request.\n"
+                "- Rule-based analysis is shown above.\n\n"
+                "[UK] Аналітична Оцінка\n"
+                "- Недоступно: модель відхилила запит.\n"
+                "- Rule-based аналіз показано вище."
             )
         return text
     except error.HTTPError as exc:
@@ -132,7 +145,7 @@ def _analyze_with_ollama(alerts: list[str]) -> str:
         return f"LLM enrichment unavailable: Ollama is not reachable ({exc})."
 
 
-def _analyze_with_gemini(alerts: list[str]) -> str:
+def _analyze_with_gemini(evidence_items: list[str]) -> str:
     if not _has_real_api_key(GEMINI_API_KEY):
         return "LLM enrichment disabled: valid GEMINI_API_KEY is not configured."
 
@@ -145,7 +158,7 @@ def _analyze_with_gemini(alerts: list[str]) -> str:
         client = genai.Client(api_key=GEMINI_API_KEY)
         response = client.models.generate_content(
             model="models/gemini-2.0-flash",
-            contents=_build_prompt(alerts),
+            contents=_build_prompt(evidence_items),
         )
         text = _clean_llm_output(response.text or "")
         return text or "LLM returned an empty response."
@@ -160,20 +173,22 @@ def _analyze_with_gemini(alerts: list[str]) -> str:
         return f"LLM enrichment unavailable: {error_text}"
 
 
-def analyze_security_incidents(alerts: list[str]) -> str:
+def analyze_security_incidents(evidence_items: list[str]) -> str:
     provider = (LLM_PROVIDER or "none").lower()
 
     if provider == "none":
         return (
-            "[EN] LLM Enrichment\n"
-            "- Disabled: provider is set to none.\n\n"
-            "[UK] LLM Збагачення\n"
-            "- Вимкнено: провайдер встановлено в none."
+            "[EN] Analyst Assessment\n"
+            "- LLM disabled: provider is set to none.\n"
+            "- The rule-based SOC assessment above still uses scanner and incident evidence.\n\n"
+            "[UK] Аналітична Оцінка\n"
+            "- LLM вимкнено: провайдер встановлено в none.\n"
+            "- Rule-based оцінка вище все одно використовує дані сканерів та інцидентів."
         )
     if provider == "ollama":
-        return _analyze_with_ollama(alerts)
+        return _analyze_with_ollama(evidence_items)
     if provider == "gemini":
-        return _analyze_with_gemini(alerts)
+        return _analyze_with_gemini(evidence_items)
 
     return (
         "LLM enrichment disabled: unknown provider. "

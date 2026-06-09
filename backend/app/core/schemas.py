@@ -69,6 +69,31 @@ class OpenVASActiveScanResponse(ActiveScanResponse):
     pass
 
 
+class OpenVASReportFindingIn(BaseModel):
+    host: Optional[str] = None
+    port: Optional[int] = None
+    protocol: str = "tcp"
+    service: Optional[str] = None
+    name: str
+    severity: str = "MEDIUM"
+    cvss: float = 0.0
+    cves: List[str] = Field(default_factory=list)
+    description: Optional[str] = None
+
+
+class OpenVASReportImportRequest(BaseModel):
+    target: Optional[str] = None
+    report_xml: Optional[str] = None
+    findings: Optional[List[OpenVASReportFindingIn]] = None
+
+
+class OpenVASReportImportResponse(BaseModel):
+    accepted: int
+    incidents_created: int
+    incidents_updated: int
+    scan_task_id: str
+
+
 class NmapActiveScanRequest(BaseModel):
     target: str
     ports: Optional[List[int]] = None

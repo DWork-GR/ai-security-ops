@@ -4,7 +4,16 @@ import socket
 import subprocess
 import xml.etree.ElementTree as ET
 
+from app.config import NMAP_BINARY, NMAP_SCAN_TYPE
+
 OPEN_TCP_PORT_REGEX = re.compile(r"(\d+)/open/tcp")
+
+
+def _base_nmap_command() -> list[str]:
+    command = [NMAP_BINARY]
+    if NMAP_SCAN_TYPE:
+        command.append(NMAP_SCAN_TYPE)
+    return command
 
 
 def _scan_tcp_port(target: str, port: int, timeout_sec: float) -> bool:
@@ -38,7 +47,7 @@ def _discover_with_nmap(
     port_arg = ",".join(str(port) for port in ports)
     host_timeout_ms = max(1000, min(300000, timeout_ms * max(1, len(ports))))
     command = [
-        "nmap",
+        *_base_nmap_command(),
         "-n",
         "-Pn",
         "--open",
@@ -66,7 +75,7 @@ def _discover_with_nmap(
 
 
 def is_nmap_available() -> bool:
-    return bool(shutil.which("nmap"))
+    return bool(shutil.which(NMAP_BINARY))
 
 
 def ensure_nmap_available() -> None:
@@ -88,7 +97,7 @@ def inspect_open_tcp_services(
     port_arg = ",".join(str(port) for port in ports)
     host_timeout_ms = max(1000, min(300000, timeout_ms * max(1, len(ports))))
     command = [
-        "nmap",
+        *_base_nmap_command(),
         "-n",
         "-Pn",
         "--open",
