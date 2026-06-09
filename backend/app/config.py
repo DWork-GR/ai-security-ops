@@ -69,6 +69,7 @@ OLLAMA_BASE_URL = os.getenv(
 ).rstrip("/")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b").strip()
 OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "").strip()
+OLLAMA_BINARY = os.getenv("OLLAMA_BINARY", "ollama").strip() or "ollama"
 RBAC_KEYS = os.getenv("RBAC_KEYS", "").strip()
 RBAC_ENABLED = _env_bool("RBAC_ENABLED", True)
 

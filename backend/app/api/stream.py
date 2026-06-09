@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
-from app.api.rbac import RBAC_ENABLED, RBAC_KEY_TO_ROLE
+from app.api.rbac import RBAC_ENABLED, RBAC_KEY_TO_ROLE, ROLE_PRIORITY
 from app.config import STREAM_ALLOW_QUERY_USER_KEY
 from app.database.db import SessionLocal
 from app.database.repository import (
@@ -64,7 +64,8 @@ def _resolve_stream_role(*, header_key: str | None, query_key: str | None) -> st
 
 
 def _ensure_allowed_role(role: str, allowed_roles: set[str]) -> None:
-    if role not in allowed_roles:
+    minimum_priority = min((ROLE_PRIORITY.get(item, 999) for item in allowed_roles), default=999)
+    if ROLE_PRIORITY.get(role, 0) < minimum_priority:
         raise HTTPException(status_code=403, detail="Insufficient role")
 
 

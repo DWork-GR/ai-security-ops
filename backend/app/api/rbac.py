@@ -1,8 +1,9 @@
-from fastapi import Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 
 from app.config import RBAC_ENABLED, RBAC_KEYS
 
 ROLE_PRIORITY = {"analyst": 1, "manager": 2, "admin": 3}
+router = APIRouter(prefix="/rbac", tags=["rbac"])
 
 
 def _parse_rbac_keys(raw: str) -> dict[str, str]:
@@ -42,10 +43,23 @@ def get_current_role(
 
 def require_roles(*allowed_roles: str):
     allowed = {role.lower() for role in allowed_roles}
+    minimum_priority = min((ROLE_PRIORITY.get(role, 999) for role in allowed), default=999)
 
     def dependency(role: str = Depends(get_current_role)) -> str:
-        if role not in allowed:
+        if ROLE_PRIORITY.get(role, 0) < minimum_priority:
             raise HTTPException(status_code=403, detail="Insufficient role")
         return role
 
     return dependency
+
+
+def current_role_info(role: str = Depends(get_current_role)) -> dict[str, str | int]:
+    return {
+        "role": role,
+        "priority": ROLE_PRIORITY.get(role, 0),
+    }
+
+
+@router.get("/me")
+def rbac_me(info: dict[str, str | int] = Depends(current_role_info)):
+    return info

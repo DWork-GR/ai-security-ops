@@ -31,6 +31,38 @@ from app.services.scan_service import run_active_scan
 router = APIRouter()
 
 
+def _normalize_language(language: str | None) -> str:
+    value = (language or "en").strip().lower()
+    return value if value in {"uk", "en", "duo"} else "uk"
+
+
+def _detect_message_language(message: str) -> str:
+    return "uk" if any("а" <= char.lower() <= "я" or char in "іїєґІЇЄҐ" for char in message or "") else "en"
+
+
+def _pick(language: str, *, en: str, uk: str) -> str:
+    if language == "en":
+        return en
+    if language == "duo":
+        return f"{uk}\n\n[EN]\n{en}"
+    return uk
+
+
+def _select_marked_language(text: str, language: str) -> str:
+    if language == "duo":
+        return text
+    marker = "[UK]" if language == "uk" else "[EN]"
+    other = "[EN]" if language == "uk" else "[UK]"
+    start = text.find(marker)
+    if start == -1:
+        return text
+    start += len(marker)
+    end = text.find(other, start)
+    if end == -1:
+        return text[start:].strip()
+    return text[start:end].strip()
+
+
 def _ensure_chat_access(x_user_key: str | None) -> str:
     if not CHAT_AUTH_REQUIRED:
         return "chat"
@@ -54,16 +86,23 @@ def _serialize_cves(cves):
     ]
 
 
-def _format_incident_rows(incidents) -> str:
+def _format_incident_rows(incidents, language: str = "uk") -> str:
     if not incidents:
-        return "No incidents found."
+        return _pick(language, en="No incidents found.", uk="Інцидентів не знайдено.")
 
-    lines = [
-        "[Incidents] Latest SOC incidents:",
-        "",
-        "| detected_at | severity | status | source | ATT&CK | message |",
-        "| --- | --- | --- | --- | --- | --- |",
-    ]
+    lines = _pick(
+        language,
+        en=(
+            "[Incidents] Latest SOC incidents:\n\n"
+            "| detected_at | severity | status | source | ATT&CK | message |\n"
+            "| --- | --- | --- | --- | --- | --- |"
+        ),
+        uk=(
+            "[Інциденти] Останні SOC-інциденти:\n\n"
+            "| час | критичність | статус | джерело | ATT&CK | повідомлення |\n"
+            "| --- | --- | --- | --- | --- | --- |"
+        ),
+    ).splitlines()
     for incident in incidents:
         message = (incident.message or "").replace("|", "/").replace("\n", " ").strip()
         attack = infer_attack_mapping(source=incident.source, message=incident.message)
@@ -75,57 +114,73 @@ def _format_incident_rows(incidents) -> str:
     return "\n".join(lines)
 
 
-def _format_incident_stats(stats: dict) -> str:
+def _format_incident_stats(stats: dict, language: str = "uk") -> str:
+    if language == "en":
+        title = "[SOC KPI Snapshot]"
+        labels = {
+            "total": "Total incidents",
+            "open": "Open incidents",
+            "critical": "Critical open incidents",
+            "last24": "Incidents in last 24h",
+            "severity": "By severity:",
+            "source": "By source:",
+            "status": "By status:",
+        }
+    else:
+        title = "[SOC KPI Знімок]"
+        labels = {
+            "total": "Усього інцидентів",
+            "open": "Відкриті інциденти",
+            "critical": "Критичні відкриті інциденти",
+            "last24": "Інциденти за останні 24 год",
+            "severity": "За критичністю:",
+            "source": "За джерелом:",
+            "status": "За статусом:",
+        }
     lines = [
-        "[SOC KPI Snapshot]",
-        f"- Total incidents: {stats['total_incidents']}",
-        f"- Open incidents: {stats['open_incidents']}",
-        f"- Critical open incidents: {stats['critical_open_incidents']}",
-        f"- Incidents in last 24h: {stats['incidents_last_24h']}",
+        title,
+        f"- {labels['total']}: {stats['total_incidents']}",
+        f"- {labels['open']}: {stats['open_incidents']}",
+        f"- {labels['critical']}: {stats['critical_open_incidents']}",
+        f"- {labels['last24']}: {stats['incidents_last_24h']}",
         "",
-        "By severity:",
+        labels["severity"],
     ]
     for severity, count in sorted(stats["by_severity"].items()):
         lines.append(f"- {severity}: {count}")
 
     lines.append("")
-    lines.append("By source:")
+    lines.append(labels["source"])
     for source, count in sorted(stats["by_source"].items()):
         lines.append(f"- {source}: {count}")
 
     lines.append("")
-    lines.append("By status:")
+    lines.append(labels["status"])
     for status, count in sorted(stats["by_status"].items()):
         lines.append(f"- {status}: {count}")
 
     return "\n".join(lines)
 
 
-def _format_active_scan_result(result: dict) -> str:
+def _format_active_scan_result(result: dict, language: str = "uk") -> str:
+    none_text = "none" if language == "en" else "немає"
     lines = [
-        "[EN] Active Scan",
-        f"- Task ID: {result['task_id']}",
-        f"- Target: {result['target']}",
-        f"- Status: {result['status']}",
-        f"- Scan profile: {result['scan_profile']}",
-        f"- Scanned ports: {result['scanned_ports']}",
-        f"- Open ports: {', '.join(str(p) for p in result['open_ports']) if result['open_ports'] else 'none'}",
-        f"- New open ports vs baseline: {', '.join(str(p) for p in result['new_open_ports']) if result['new_open_ports'] else 'none'}",
-        f"- Closed open ports vs baseline: {', '.join(str(p) for p in result['closed_open_ports']) if result['closed_open_ports'] else 'none'}",
-        f"- Findings: {len(result['findings'])}",
-        f"- Incidents: created={result['incidents_created']}, updated={result['incidents_updated']}",
-        "",
-        "[UK] Активне Сканування",
-        f"- Ціль: {result['target']}",
-        f"- Відкриті порти: {', '.join(str(p) for p in result['open_ports']) if result['open_ports'] else 'немає'}",
-        f"- Нові порти проти baseline: {', '.join(str(p) for p in result['new_open_ports']) if result['new_open_ports'] else 'немає'}",
-        f"- Закриті порти проти baseline: {', '.join(str(p) for p in result['closed_open_ports']) if result['closed_open_ports'] else 'немає'}",
-        f"- Знахідок: {len(result['findings'])}",
+        "[Active Scan]" if language == "en" else "[Активне Сканування]",
+        f"- {'Task ID' if language == 'en' else 'ID завдання'}: {result['task_id']}",
+        f"- {'Target' if language == 'en' else 'Ціль'}: {result['target']}",
+        f"- {'Status' if language == 'en' else 'Статус'}: {result['status']}",
+        f"- {'Scan profile' if language == 'en' else 'Профіль сканування'}: {result['scan_profile']}",
+        f"- {'Scanned ports' if language == 'en' else 'Перевірено портів'}: {result['scanned_ports']}",
+        f"- {'Open ports' if language == 'en' else 'Відкриті порти'}: {', '.join(str(p) for p in result['open_ports']) if result['open_ports'] else none_text}",
+        f"- {'New open ports vs baseline' if language == 'en' else 'Нові відкриті порти проти baseline'}: {', '.join(str(p) for p in result['new_open_ports']) if result['new_open_ports'] else none_text}",
+        f"- {'Closed open ports vs baseline' if language == 'en' else 'Закриті порти проти baseline'}: {', '.join(str(p) for p in result['closed_open_ports']) if result['closed_open_ports'] else none_text}",
+        f"- {'Findings' if language == 'en' else 'Знахідок'}: {len(result['findings'])}",
+        f"- {'Incidents' if language == 'en' else 'Інциденти'}: created={result['incidents_created']}, updated={result['incidents_updated']}",
     ]
 
     if result["findings"]:
         lines.append("")
-        lines.append("Top findings:")
+        lines.append("Top findings:" if language == "en" else "Топ знахідок:")
         for finding in result["findings"][:5]:
             cves = ", ".join(finding["cve_references"]) if finding["cve_references"] else "n/a"
             lines.append(
@@ -135,15 +190,14 @@ def _format_active_scan_result(result: dict) -> str:
     return "\n".join(lines)
 
 
-def _format_error_rows(items) -> str:
+def _format_error_rows(items, language: str = "uk") -> str:
     if not items:
-        return "No error events found."
-    lines = [
-        "[Errors] Latest error events:",
-        "",
-        "| last_seen_at | severity | operation | error_type | count |",
-        "| --- | --- | --- | --- | --- |",
-    ]
+        return _pick(language, en="No error events found.", uk="Подій помилок не знайдено.")
+    lines = _pick(
+        language,
+        en="[Errors] Latest error events:\n\n| last_seen_at | severity | operation | error_type | count |\n| --- | --- | --- | --- | --- |",
+        uk="[Помилки] Останні події помилок:\n\n| останній_раз | критичність | операція | тип_помилки | кількість |\n| --- | --- | --- | --- | --- |",
+    ).splitlines()
     for item in items:
         operation = f"{item.source}.{item.operation}".replace("|", "/")
         error_type = (item.error_type or "").replace("|", "/")
@@ -154,25 +208,96 @@ def _format_error_rows(items) -> str:
     return "\n".join(lines)
 
 
-def _format_error_stats(stats: dict) -> str:
+def _format_error_stats(stats: dict, language: str = "uk") -> str:
+    if language == "en":
+        labels = {
+            "title": "[Error Stats]",
+            "total": "Total unique errors",
+            "occurrences": "Total occurrences",
+            "last24": "Errors in last 24h",
+            "severity": "By severity:",
+            "source": "By source:",
+        }
+    else:
+        labels = {
+            "title": "[Статистика Помилок]",
+            "total": "Унікальних помилок",
+            "occurrences": "Усього повторень",
+            "last24": "Помилки за останні 24 год",
+            "severity": "За критичністю:",
+            "source": "За джерелом:",
+        }
     lines = [
-        "[Error Stats]",
-        f"- Total unique errors: {stats['total_errors']}",
-        f"- Total occurrences: {stats['total_occurrences']}",
-        f"- Errors in last 24h: {stats['errors_last_24h']}",
+        labels["title"],
+        f"- {labels['total']}: {stats['total_errors']}",
+        f"- {labels['occurrences']}: {stats['total_occurrences']}",
+        f"- {labels['last24']}: {stats['errors_last_24h']}",
         "",
-        "By severity:",
+        labels["severity"],
     ]
     for key, value in sorted(stats["by_severity"].items()):
         lines.append(f"- {key}: {value}")
     lines.append("")
-    lines.append("By source:")
+    lines.append(labels["source"])
     for key, value in sorted(stats["by_source"].items()):
         lines.append(f"- {key}: {value}")
     return "\n".join(lines)
 
 
-def _format_help_menu(topic: str | None = None) -> str:
+def _format_help_menu(topic: str | None = None, language: str = "uk") -> str:
+    if language == "en":
+        if topic == "scan":
+            return (
+                "[Help: Scanning]\n"
+                "Quick commands:\n"
+                "- scan <ip>\n"
+                "- full check <ip>\n\n"
+                "The response shows open ports, baseline changes, findings, and created/updated incidents.\n\n"
+                "Example:\n"
+                "- full check 127.0.0.1"
+            )
+        if topic == "incidents":
+            return (
+                "[Help: Incidents]\n"
+                "- show incidents\n"
+                "- incident stats\n"
+                "- analyze threats\n\n"
+                "Recommended demo flow: run full check <ip>, then show incidents."
+            )
+        if topic == "cves":
+            return (
+                "[Help: CVE Knowledge Base]\n"
+                "- show critical cves\n"
+                "- search cve apache\n"
+                "- CVE-2021-44228"
+            )
+        if topic == "errors":
+            return (
+                "[Help: Errors]\n"
+                "- show errors\n"
+                "- error stats\n\n"
+                "This view tracks integration and operational failures."
+            )
+        return (
+            "[User Menu]\n"
+            "Quick start:\n"
+            "1. full check 127.0.0.1\n"
+            "2. show incidents\n"
+            "3. incident stats\n\n"
+            "Main commands:\n"
+            "- help\n"
+            "- full check <ip>\n"
+            "- scan <ip>\n"
+            "- show incidents\n"
+            "- incident stats\n"
+            "- show critical cves\n"
+            "- search cve <keyword>\n"
+            "- show errors\n"
+            "- error stats\n"
+            "- analyze threats\n"
+            "- system status\n"
+            "- roadmap"
+        )
     if topic == "scan":
         return (
             "[Допомога: Сканування]\n"
@@ -256,23 +381,56 @@ def _format_help_menu(topic: str | None = None) -> str:
     )
 
 
-def _format_platform_status(overview: dict, incident_stats: dict, error_stats: dict) -> str:
+def _format_platform_status(overview: dict, incident_stats: dict, error_stats: dict, language: str = "uk") -> str:
+    if language == "en":
+        return (
+            "[System Status]\n"
+            f"- CVE records: {overview['total_cves']}\n"
+            f"- Assets: {overview['total_assets']}\n"
+            f"- Scan runs: {overview['total_scan_runs']}\n"
+            f"- Scan findings: {overview['total_scan_findings']}\n"
+            f"- Incidents total: {overview['total_incidents']}\n"
+            f"- Open incidents: {incident_stats['open_incidents']}\n"
+            f"- Critical open incidents: {incident_stats['critical_open_incidents']}\n"
+            f"- Error events: {overview['total_errors']}\n"
+            f"- Error occurrences: {error_stats['total_occurrences']}\n"
+            f"- Last scan at: {overview['last_scan_at'] or 'n/a'}"
+        )
     return (
         "[Статус Системи]\n"
-        f"- CVE records: {overview['total_cves']}\n"
-        f"- Assets: {overview['total_assets']}\n"
-        f"- Scan runs: {overview['total_scan_runs']}\n"
-        f"- Scan findings: {overview['total_scan_findings']}\n"
-        f"- Incidents total: {overview['total_incidents']}\n"
-        f"- Open incidents: {incident_stats['open_incidents']}\n"
-        f"- Critical open incidents: {incident_stats['critical_open_incidents']}\n"
-        f"- Error events: {overview['total_errors']}\n"
-        f"- Error occurrences: {error_stats['total_occurrences']}\n"
-        f"- Last scan at: {overview['last_scan_at'] or 'n/a'}"
+        f"- CVE-записів: {overview['total_cves']}\n"
+        f"- Активів: {overview['total_assets']}\n"
+        f"- Запусків сканування: {overview['total_scan_runs']}\n"
+        f"- Знахідок сканування: {overview['total_scan_findings']}\n"
+        f"- Усього інцидентів: {overview['total_incidents']}\n"
+        f"- Відкриті інциденти: {incident_stats['open_incidents']}\n"
+        f"- Критичні відкриті інциденти: {incident_stats['critical_open_incidents']}\n"
+        f"- Подій помилок: {overview['total_errors']}\n"
+        f"- Повторень помилок: {error_stats['total_occurrences']}\n"
+        f"- Останній скан: {overview['last_scan_at'] or 'n/a'}"
     )
 
 
-def _format_diploma_roadmap() -> str:
+def _format_diploma_roadmap(language: str = "uk") -> str:
+    if language == "en":
+        return (
+            "[Diploma Development Roadmap]\n"
+            "Phase 1 (quick):\n"
+            "- Add 1-2 real log sources (syslog/Windows Event)\n"
+            "- Build a repeatable demo scenario with 3 attack signals\n\n"
+            "Phase 2 (medium):\n"
+            "- Scheduled NVD auto-import\n"
+            "- Asset criticality -> risk scoring\n"
+            "- SLA metrics (MTTA/MTTR)\n\n"
+            "Phase 3 (enterprise):\n"
+            "- Scan queue plus workers\n"
+            "- Multi-tenant RBAC\n"
+            "- PDF executive report for management\n\n"
+            "Defense KPI:\n"
+            "- >10k CVEs in the knowledge base\n"
+            "- Full cycle: scan -> correlate -> incident -> report\n"
+            "- Repeatable 5-7 minute demo scenario"
+        )
     return (
         "[План Розвитку Диплому]\n"
         "Phase 1 (швидко):\n"
@@ -299,7 +457,34 @@ def _format_full_check_summary(
     incident_stats: dict,
     error_stats: dict,
     top_cves,
+    language: str = "uk",
 ) -> str:
+    if language == "uk":
+        lines = [
+            "[Повна Перевірка]",
+            f"- Ціль: {target_ip}",
+            f"- Відкриті порти: {', '.join(str(p) for p in scan_result['open_ports']) if scan_result['open_ports'] else 'немає'}",
+            f"- Нові порти проти baseline: {', '.join(str(p) for p in scan_result['new_open_ports']) if scan_result['new_open_ports'] else 'немає'}",
+            f"- Знахідок: {len(scan_result['findings'])}",
+            "",
+            "SOC Знімок:",
+            f"- Усього інцидентів: {incident_stats['total_incidents']}",
+            f"- Відкриті інциденти: {incident_stats['open_incidents']}",
+            f"- Критичні відкриті інциденти: {incident_stats['critical_open_incidents']}",
+            "",
+            "Знімок Операційних Помилок:",
+            f"- Унікальних помилок: {error_stats['total_errors']}",
+            f"- Повторень помилок: {error_stats['total_occurrences']}",
+            "",
+            "Топ CVE (CVSS >= 9):",
+        ]
+        if top_cves:
+            for item in top_cves[:5]:
+                lines.append(f"- {item.cve_id} | CVSS {item.cvss} | {item.severity}")
+        else:
+            lines.append("- Записів немає.")
+        return "\n".join(lines)
+
     lines = [
         "[Full Check]",
         f"- Target: {target_ip}",
@@ -386,9 +571,9 @@ def _build_soc_evidence(db: Session) -> list[str]:
     return evidence
 
 
-def _format_rule_based_soc_assessment(evidence: list[str]) -> str:
+def _format_rule_based_soc_assessment(evidence: list[str], language: str = "uk") -> str:
     if not evidence:
-        return (
+        return _select_marked_language(
             "[EN] Rule-Based SOC Assessment\n"
             "Executive Summary:\n"
             "- No scanner, incident, or IDS evidence is available yet.\n"
@@ -398,7 +583,8 @@ def _format_rule_based_soc_assessment(evidence: list[str]) -> str:
             "Короткий Висновок:\n"
             "- Даних від сканерів, інцидентів або IDS ще немає.\n"
             "Наступні Дії:\n"
-            "- Запустіть Nmap/OpenVAS або передайте Snort alerts, потім повторіть аналіз."
+            "- Запустіть Nmap/OpenVAS або передайте Snort alerts, потім повторіть аналіз.",
+            language,
         )
 
     scan_findings = [item for item in evidence if item.startswith("SCAN_FINDING")]
@@ -449,7 +635,7 @@ def _format_rule_based_soc_assessment(evidence: list[str]) -> str:
         "- Закрити або обмежити непотрібні сервіси і повторити сканування.",
     ])
 
-    return "\n".join(lines)
+    return _select_marked_language("\n".join(lines), language)
 
 
 @router.post("/chat")
@@ -461,10 +647,11 @@ def process_message(
     chat_actor_role = _ensure_chat_access(x_user_key)
     try:
         message = request.message.strip()
+        language = _normalize_language(request.language) if request.language else _detect_message_language(message)
         intent, entities = detect_intent(message)
 
         if intent == "help_menu":
-            return {"type": "text", "message": _format_help_menu(entities.get("topic"))}
+            return {"type": "text", "message": _format_help_menu(entities.get("topic"), language)}
 
         if intent == "platform_status":
             overview = get_platform_overview_stats(db)
@@ -472,39 +659,39 @@ def process_message(
             error_stats = get_error_summary_stats(db)
             return {
                 "type": "text",
-                "message": _format_platform_status(overview, incident_stats, error_stats),
+                "message": _format_platform_status(overview, incident_stats, error_stats, language),
             }
 
         if intent == "diploma_roadmap":
-            return {"type": "text", "message": _format_diploma_roadmap()}
+            return {"type": "text", "message": _format_diploma_roadmap(language)}
 
         if intent == "list_cves":
             cves = get_all_cves(db) or []
             if not cves:
-                return {"type": "text", "message": "No CVE records found."}
+                return {"type": "text", "message": _pick(language, en="No CVE records found.", uk="CVE-записи відсутні.")}
             return {"type": "cves", "cves": _serialize_cves(cves)}
 
         if intent == "critical_cves":
             cves = get_critical_cves(db) or []
             if not cves:
-                return {"type": "text", "message": "No critical CVEs found."}
+                return {"type": "text", "message": _pick(language, en="No critical CVEs found.", uk="Критичних CVE не знайдено.")}
             return {"type": "cves", "cves": _serialize_cves(cves)}
 
         if intent == "search_cves":
             query = entities.get("query")
             cves = search_cves(db, query=query, limit=25)
             if not cves:
-                return {"type": "text", "message": "No matching CVEs found."}
+                return {"type": "text", "message": _pick(language, en="No matching CVEs found.", uk="Відповідних CVE не знайдено.")}
             return {"type": "cves", "cves": _serialize_cves(cves)}
 
         if intent == "cve_lookup":
             cve_id = entities.get("cve_id")
             if not cve_id:
-                return {"type": "text", "message": "CVE identifier is missing."}
+                return {"type": "text", "message": _pick(language, en="CVE identifier is missing.", uk="Ідентифікатор CVE відсутній.")}
 
             cve = get_cve_by_id(db, cve_id)
             if not cve:
-                return {"type": "text", "message": f"CVE {cve_id} was not found."}
+                return {"type": "text", "message": _pick(language, en=f"CVE {cve_id} was not found.", uk=f"CVE {cve_id} не знайдено.")}
 
             return {
                 "type": "text",
@@ -519,13 +706,13 @@ def process_message(
         if intent == "full_check":
             ip_address = entities.get("ip_address")
             if not ip_address:
-                return {"type": "text", "message": "IP address is required: full check <ip>"}
+                return {"type": "text", "message": _pick(language, en="IP address is required: full check <ip>", uk="Потрібна IP-адреса: повна перевірка <ip>")}
             try:
                 ip_address = ensure_allowed_scan_target(ip_address)
             except ValueError as exc:
                 return {"type": "text", "message": str(exc)}
 
-            scan_result = run_active_scan(db, target=ip_address)
+            scan_result = run_active_scan(db, target=ip_address, source="nmap")
             incident_stats = get_incident_summary_stats(db)
             error_stats = get_error_summary_stats(db)
             top_cves = search_cves(db, min_cvss=9, limit=5)
@@ -537,36 +724,37 @@ def process_message(
                     incident_stats,
                     error_stats,
                     top_cves,
+                    language,
                 ),
             }
 
         if intent == "scan_ip":
             ip_address = entities.get("ip_address")
             if not ip_address:
-                return {"type": "text", "message": "IP address is missing."}
+                return {"type": "text", "message": _pick(language, en="IP address is missing.", uk="IP-адресу не вказано.")}
             try:
                 ip_address = ensure_allowed_scan_target(ip_address)
             except ValueError as exc:
                 return {"type": "text", "message": str(exc)}
 
-            result = run_active_scan(db, target=ip_address)
-            return {"type": "text", "message": _format_active_scan_result(result)}
+            result = run_active_scan(db, target=ip_address, source="nmap")
+            return {"type": "text", "message": _format_active_scan_result(result, language)}
 
         if intent == "list_incidents":
             incidents = list_incidents(db, limit=10)
-            return {"type": "text", "message": _format_incident_rows(incidents)}
+            return {"type": "text", "message": _format_incident_rows(incidents, language)}
 
         if intent == "incident_stats":
             stats = get_incident_summary_stats(db)
-            return {"type": "text", "message": _format_incident_stats(stats)}
+            return {"type": "text", "message": _format_incident_stats(stats, language)}
 
         if intent == "list_errors":
             items = list_error_events(db, limit=10)
-            return {"type": "text", "message": _format_error_rows(items)}
+            return {"type": "text", "message": _format_error_rows(items, language)}
 
         if intent == "error_stats":
             stats = get_error_summary_stats(db)
-            return {"type": "text", "message": _format_error_stats(stats)}
+            return {"type": "text", "message": _format_error_stats(stats, language)}
 
         if intent == "analyze_threats":
             alerts = get_critical_alerts()
@@ -592,19 +780,30 @@ def process_message(
                 evidence = ["NO_EVIDENCE No scanner findings, incidents, Snort alerts, or integration errors were found."]
 
             snort_analysis = analyze_alerts_expert(alert_messages)
-            rule_analysis = _format_rule_based_soc_assessment(evidence)
-            llm_analysis = analyze_security_incidents(evidence)
+            rule_analysis = _format_rule_based_soc_assessment(evidence, language)
+            llm_analysis = analyze_security_incidents(evidence, language=language)
+            summary_block = (
+                "[Incidents]\n"
+                f"- created: {created_count}\n"
+                f"- updated: {updated_count}\n\n"
+                "[Evidence]\n"
+                f"- items: {len(evidence)}\n"
+                f"- snort_priority_1_alerts: {len(alert_messages)}\n\n"
+                if language == "en"
+                else
+                "[Інциденти]\n"
+                f"- створено: {created_count}\n"
+                f"- оновлено: {updated_count}\n\n"
+                "[Докази]\n"
+                f"- елементів: {len(evidence)}\n"
+                f"- snort_priority_1_alerts: {len(alert_messages)}\n\n"
+            )
             return {
                 "type": "text",
                 "message": (
-                    "[Incidents]\n"
-                    f"- created: {created_count}\n"
-                    f"- updated: {updated_count}\n\n"
-                    "[Evidence]\n"
-                    f"- items: {len(evidence)}\n"
-                    f"- snort_priority_1_alerts: {len(alert_messages)}\n\n"
+                    summary_block +
                     f"{rule_analysis}\n\n"
-                    "[Snort Rule Engine]\n"
+                    f"[{'Snort Rule Engine' if language == 'en' else 'Snort Rule Engine'}]\n"
                     f"{snort_analysis}\n\n"
                     "[LLM]\n"
                     f"{llm_analysis}"
@@ -613,9 +812,10 @@ def process_message(
 
         return {
             "type": "text",
-            "message": (
-                "Невідома команда.\n"
-                "Напиши `допомога`, щоб побачити доступні команди."
+            "message": _pick(
+                language,
+                en="Unknown command.\nType `help` to see available commands.",
+                uk="Невідома команда.\nНапиши `допомога`, щоб побачити доступні команди.",
             ),
         }
 
@@ -634,5 +834,9 @@ def process_message(
             reference = "n/a"
         return {
             "type": "text",
-            "message": f"Server error. Check backend logs. Error reference: {reference}",
+            "message": _pick(
+                _normalize_language(getattr(request, "language", "uk")),
+                en=f"Server error. Check backend logs. Error reference: {reference}",
+                uk=f"Помилка сервера. Перевір логи бекенду. Код помилки: {reference}",
+            ),
         }

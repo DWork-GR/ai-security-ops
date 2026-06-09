@@ -59,6 +59,7 @@ def _compact_scan_result(result: dict) -> dict:
     return {
         "task_id": result.get("task_id"),
         "scanner": result.get("scanner"),
+        "discovery_engine": result.get("discovery_engine"),
         "target": result.get("target"),
         "status": result.get("status"),
         "scan_profile": result.get("scan_profile"),
@@ -70,6 +71,37 @@ def _compact_scan_result(result: dict) -> dict:
         "incidents_created": result.get("incidents_created", 0),
         "incidents_updated": result.get("incidents_updated", 0),
     }
+
+
+def _compact_failed_step(*, scanner: str, target_ip: str, exc: Exception) -> dict:
+    return {
+        "scanner": scanner,
+        "target": target_ip,
+        "status": "failed",
+        "error": str(exc),
+    }
+
+
+def _run_vulnerability_profile(db: Session, *, target_ip: str) -> dict:
+    try:
+        return run_active_scan(
+            db,
+            target=target_ip,
+            source="openvas",
+        )
+    except Exception as exc:
+        fallback = run_active_scan(
+            db,
+            target=target_ip,
+            source="nmap",
+        )
+        fallback["warnings"] = [
+            (
+                "Vulnerability scripts timed out or failed. "
+                f"Fallback discovery scan was completed instead: {exc}"
+            )
+        ]
+        return fallback
 
 
 def _run_profile(db: Session, *, target_ip: str, scan_type: str) -> dict:
@@ -90,38 +122,51 @@ def _run_profile(db: Session, *, target_ip: str, scan_type: str) -> dict:
             source="nmap",
         )
     if scan_kind == "vulnerability":
-        return run_active_scan(
-            db,
-            target=target_ip,
-            source="openvas",
-        )
+        return _run_vulnerability_profile(db, target_ip=target_ip)
     if scan_kind == "full":
         discovery = run_active_scan(
             db,
             target=target_ip,
             source="nmap",
         )
-        vulnerability = run_active_scan(
-            db,
-            target=target_ip,
-            source="openvas",
-        )
+        vulnerability_error = None
+        try:
+            vulnerability = run_active_scan(
+                db,
+                target=target_ip,
+                source="openvas",
+            )
+        except Exception as exc:
+            vulnerability_error = exc
+            vulnerability = None
+
+        steps = [_compact_scan_result(discovery)]
+        if vulnerability:
+            steps.append(_compact_scan_result(vulnerability))
+        else:
+            steps.append(_compact_failed_step(scanner="openvas", target_ip=target_ip, exc=vulnerability_error))
+
         return {
             "mode": "full",
             "target": target_ip,
-            "steps": [
-                _compact_scan_result(discovery),
-                _compact_scan_result(vulnerability),
-            ],
+            "status": "partial" if vulnerability_error else "completed",
+            "steps": steps,
+            "warnings": [
+                (
+                    "Vulnerability script step timed out or failed; "
+                    "Nmap discovery results are still available."
+                )
+            ] if vulnerability_error else [],
             "combined_open_ports": sorted(
-                set(discovery.get("open_ports", [])) | set(vulnerability.get("open_ports", []))
+                set(discovery.get("open_ports", []))
+                | set((vulnerability or {}).get("open_ports", []))
             ),
             "total_findings_count": len(discovery.get("findings", []))
-            + len(vulnerability.get("findings", [])),
+            + len((vulnerability or {}).get("findings", [])),
             "total_incidents_created": int(discovery.get("incidents_created", 0))
-            + int(vulnerability.get("incidents_created", 0)),
+            + int((vulnerability or {}).get("incidents_created", 0)),
             "total_incidents_updated": int(discovery.get("incidents_updated", 0))
-            + int(vulnerability.get("incidents_updated", 0)),
+            + int((vulnerability or {}).get("incidents_updated", 0)),
         }
 
     raise ValueError("Unsupported scan type")

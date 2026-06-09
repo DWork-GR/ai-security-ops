@@ -11,6 +11,7 @@ from app.api.integrations import router as integrations_router
 from app.api.knowledge import router as knowledge_router
 from app.api.outbound import router as outbound_router
 from app.api.reports import router as reports_router
+from app.api.rbac import router as rbac_router
 from app.api.scans import router as scans_router
 from app.api.stream import router as stream_router
 from app.config import CORS_ORIGINS
@@ -53,6 +54,7 @@ app.include_router(assets_router)
 app.include_router(outbound_router)
 app.include_router(scans_router)
 app.include_router(stream_router)
+app.include_router(rbac_router)
 
 
 @app.get("/")

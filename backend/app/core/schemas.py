@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 class ChatRequest(BaseModel):
     message: str
     user_id: Optional[str] = None
+    language: Optional[str] = None
 
 
 class ChatResponse(BaseModel):

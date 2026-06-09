@@ -144,6 +144,12 @@ def test_chat_cve_lookup_and_critical_list(client):
     assert lookup_payload["type"] == "text"
     assert "CVSS" in lookup_payload["message"]
 
+    flexible_lookup = client.post("/chat", json={"message": "cve 2021 44228"})
+    assert flexible_lookup.status_code == 200
+    flexible_payload = flexible_lookup.json()
+    assert flexible_payload["type"] == "text"
+    assert "CVE-2021-44228" in flexible_payload["message"]
+
     critical = client.post("/chat", json={"message": "show critical cves"})
     assert critical.status_code == 200
     critical_payload = critical.json()
@@ -279,6 +285,22 @@ def test_rbac_manager_required_for_reports_and_audit(client, monkeypatch):
         headers={"X-User-Key": "manager-key"},
     )
     assert manager_audit.status_code == 200
+
+    admin_audit = client.get(
+        f"/incidents/{incident_id}/audit",
+        headers={"X-User-Key": "admin-key"},
+    )
+    assert admin_audit.status_code == 200
+
+    analyst_me = client.get("/rbac/me", headers={"X-User-Key": "analyst-key"})
+    assert analyst_me.status_code == 200
+    assert analyst_me.json()["role"] == "analyst"
+    assert analyst_me.json()["priority"] == 1
+
+    admin_me = client.get("/rbac/me", headers={"X-User-Key": "admin-key"})
+    assert admin_me.status_code == 200
+    assert admin_me.json()["role"] == "admin"
+    assert admin_me.json()["priority"] == 3
 
 
 def test_rbac_status_restriction_for_close_flow(client, monkeypatch):
@@ -612,7 +634,8 @@ def test_chat_help_menu_is_available(client):
     assert response_en.status_code == 200
     payload_en = response_en.json()
     assert payload_en["type"] == "text"
-    assert payload_en["message"] == payload["message"]
+    assert "[User Menu]" in payload_en["message"]
+    assert "full check <ip>" in payload_en["message"]
 
 
 def test_chat_full_check_runs_pipeline(client):
@@ -620,8 +643,8 @@ def test_chat_full_check_runs_pipeline(client):
     assert response.status_code == 200
     payload = response.json()
     assert payload["type"] == "text"
-    assert "[Full Check]" in payload["message"]
-    assert "SOC Snapshot:" in payload["message"]
+    assert "[Повна Перевірка]" in payload["message"]
+    assert "SOC Знімок:" in payload["message"]
 
 
 def test_chat_ukrainian_incident_and_error_commands(client):
@@ -657,7 +680,7 @@ def test_chat_platform_status_and_roadmap(client):
     status_payload = status.json()
     assert status_payload["type"] == "text"
     assert "[Статус Системи]" in status_payload["message"]
-    assert "CVE records:" in status_payload["message"]
+    assert "CVE-записів:" in status_payload["message"]
 
     roadmap = client.post("/chat", json={"message": "план розвитку"})
     assert roadmap.status_code == 200

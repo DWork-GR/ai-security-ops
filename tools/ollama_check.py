@@ -1,5 +1,6 @@
 import json
 import os
+import socket
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -26,14 +27,17 @@ def main() -> int:
     base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
     model = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
     provider = os.getenv("LLM_PROVIDER", "none")
+    binary = os.getenv("OLLAMA_BINARY", "ollama")
 
     print(f"LLM_PROVIDER={provider}")
     print(f"OLLAMA_BASE_URL={base_url}")
     print(f"OLLAMA_MODEL={model}")
+    print(f"OLLAMA_BINARY={binary}")
+    print(f"binary_exists={Path(binary).exists()}")
 
     try:
         tags = _get_json(f"{base_url}/api/tags")
-    except urllib.error.URLError as exc:
+    except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
         print(f"ollama_api=unreachable ({exc})")
         return 1
 

@@ -53,10 +53,10 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-export async function sendToBackend(message) {
+export async function sendToBackend(message, language = "uk") {
   return request("/chat", {
     method: "POST",
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, language }),
   });
 }
 
@@ -91,5 +91,9 @@ export async function listDiscoveredAssets(params = {}) {
 
 export async function seedRealWorldThreats() {
   return request("/knowledge/cves/seed/real-world", { method: "POST" });
+}
+
+export async function getCurrentRole() {
+  return request("/rbac/me", { method: "GET" });
 }
 

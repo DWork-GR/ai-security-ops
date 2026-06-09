@@ -9,13 +9,14 @@ import {
 import {
   createScanJob,
   getApiBase,
+  getCurrentRole,
   getUserKey,
   listDiscoveredAssets,
   listScanJobs,
   seedRealWorldThreats,
   sendToBackend,
   setUserKey,
-} from "./api.js";
+} from "./api.js?v=20260520-rbac-lang";
 import {
   applyUiTranslations,
   getLang,
@@ -23,7 +24,7 @@ import {
   localizeStatusToken,
   setLang,
   t,
-} from "./i18n.js";
+} from "./i18n.js?v=20260520-rbac-lang";
 
 const input = document.getElementById("input");
 const form = document.getElementById("chat-form");
@@ -38,6 +39,7 @@ const seedThreatPackBtn = document.getElementById("seed-threat-pack");
 const liveFeedEl = document.getElementById("live-feed");
 const socStatusEl = document.getElementById("soc-connection-status");
 const langSelectEl = document.getElementById("lang-select");
+const authRoleEl = document.getElementById("auth-role");
 let scanJobsTimerId = null;
 let discoveredAssetsTimerId = null;
 let socStream = null;
@@ -46,6 +48,21 @@ let streamFirstSnapshotReceived = false;
 let latestCriticalIncidentId = null;
 let scanAuthWarningShown = false;
 let discoveredAssetsAuthWarningShown = false;
+
+async function refreshCurrentRole() {
+  if (!authRoleEl) return;
+  const key = getUserKey();
+  if (!key) {
+    authRoleEl.textContent = `${t("chat_scan_status")}: ${t("render_unknown")}`;
+    return;
+  }
+  try {
+    const info = await getCurrentRole();
+    authRoleEl.textContent = `Role: ${info.role || t("render_unknown")}`;
+  } catch (err) {
+    authRoleEl.textContent = "Role: invalid";
+  }
+}
 
 function localizeScanType(scanType) {
   const key = `ui_scan_${String(scanType || "").toLowerCase()}`;
@@ -60,6 +77,23 @@ function localizeScanType(scanType) {
   return translated;
 }
 
+function localizePrompt(prompt) {
+  if (getLang() !== "uk") return prompt;
+  const target = getScanTarget();
+  const prompts = {
+    "help": "допомога",
+    "full check 127.0.0.1": `повна перевірка ${target}`,
+    "show critical cves": "покажи критичні cve",
+    "show incidents": "покажи інциденти",
+    "incident stats": "статистика інцидентів",
+    "show errors": "покажи помилки",
+    "analyze threats": "аналіз загроз",
+    "system status": "статус системи",
+    "roadmap": "план розвитку",
+  };
+  return prompts[prompt] || prompt;
+}
+
 async function handleSend(forcedText = null) {
   if (!input) return;
 
@@ -71,7 +105,7 @@ async function handleSend(forcedText = null) {
   const loader = renderMessage("system", t("chat_analyzing"));
 
   try {
-    const data = await sendToBackend(text);
+    const data = await sendToBackend(text, getLang());
     removeMessage(loader);
 
     if (data.type === "cves") {
@@ -321,7 +355,7 @@ if (quickActionsEl) {
     if (!(action instanceof HTMLElement)) return;
     const prompt = action.dataset.prompt;
     if (!prompt) return;
-    handleSend(prompt);
+    handleSend(localizePrompt(prompt));
   });
 }
 
@@ -348,6 +382,7 @@ if (userKeyInput) {
     refreshScanJobs();
     startDiscoveredAssetsPolling();
     refreshDiscoveredAssets();
+    refreshCurrentRole();
     connectSocStream();
   });
 }
@@ -371,6 +406,7 @@ if (seedThreatPackBtn) {
 startScanJobsPolling();
 startDiscoveredAssetsPolling();
 applyUiTranslations();
+refreshCurrentRole();
 connectSocStream();
 
 if (document.getElementById("messages")?.children.length === 0) {

@@ -17,6 +17,12 @@
   box-shadow: 0 0 0 2px rgba(79, 160, 255, 0.16);
 }
 
+.auth-role {
+  margin: 6px 0 10px;
+  font-size: 11px;
+  color: var(--txt-soft);
+}
+
 .input-area {
   border-top: 1px solid var(--line-soft);
   padding: 14px 18px 18px;
